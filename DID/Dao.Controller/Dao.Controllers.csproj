@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.ViewFeatures" Version="2.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dao.Common\Dao.Common.csproj" />
+    <ProjectReference Include="..\Dao.Models\Dao.Models.csproj" />
+    <ProjectReference Include="..\Dao.Services\Dao.Services.csproj" />
+    <ProjectReference Include="..\DID.Models\DID.Models.csproj" />
+    <ProjectReference Include="..\DID.Services\DID.Services.csproj" />
+  </ItemGroup>
+
+</Project>
