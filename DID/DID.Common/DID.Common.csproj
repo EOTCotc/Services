@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Http" Version="2.2.2" />
+    <PackageReference Include="Microsoft.AspNetCore.Http.Abstractions" Version="2.2.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Abstractions" Version="2.2.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Core" Version="2.2.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="6.0.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="NPoco" Version="5.3.2" />
+    <PackageReference Include="NPoco.SqlServer" Version="5.3.2" />
+    <PackageReference Include="OpenCvSharp4.Extensions" Version="4.6.0.20220608" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.6.0.20220608" />
+    <PackageReference Include="OpenCvSharp4.Windows" Version="4.6.0.20220608" />
+    <PackageReference Include="RestSharp" Version="108.0.2" />
+    <PackageReference Include="System.Drawing.Common" Version="6.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dao.Models\Dao.Models.csproj" />
+    <ProjectReference Include="..\DID.Models\DID.Models.csproj" />
+  </ItemGroup>
+
+</Project>
