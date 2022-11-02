@@ -218,7 +218,14 @@ namespace DID.Services
             userRespon.HasPassWord = !string.IsNullOrEmpty(user.PayPassWord);
 
             //空投
-            userRespon.AirdropEotc = CurrentUser.GetAirdrop(user.DIDUserId);
+            var model = CurrentUser.GetEUModel(user.DIDUserId);
+            userRespon.AirdropEotc = model?.Airdrop??0;
+
+            userRespon.EOTC = model?.EOTC ?? 0;
+
+            userRespon.USDT = model?.USDT ?? 0;
+
+            userRespon.StakeEotc = model?.StakeEotc ?? 0;
 
             return InvokeResult.Success(userRespon);
         }
@@ -288,7 +295,14 @@ namespace DID.Services
             userRespon.HasPassWord = !string.IsNullOrEmpty(user.PayPassWord);
 
             //空投
-            userRespon.AirdropEotc = CurrentUser.GetAirdrop(userId);
+            var model = CurrentUser.GetEUModel(user.DIDUserId);
+            userRespon.AirdropEotc = model?.Airdrop ?? 0;
+
+            userRespon.EOTC = model?.EOTC ?? 0;
+
+            userRespon.USDT = model?.USDT ?? 0;
+
+            userRespon.StakeEotc = model?.StakeEotc ?? 0;
 
             return InvokeResult.Success(userRespon);
         }
@@ -359,9 +373,9 @@ namespace DID.Services
                 if (!string.IsNullOrEmpty(req.RefUserId))
                 {
                     var uid = await db.SingleOrDefaultAsync<string>("select UId from DIDUser where DIDUserId = @0 and IsLogout = 0", user.DIDUserId);
-                    var pid = await db.SingleOrDefaultAsync<string>("select UId from DIDUser where DIDUserId = @0 and IsLogout = 0", user.RefUserId);
-                    var code = CurrentUser.RegisterEotc(user.Mail, "''","''","''", uid, pid);
-                    if(code == -1)
+                    var pid = await db.SingleOrDefaultAsync<string>("select UId from DIDUser where DIDUserId = @0 and IsLogout = 0", req.RefUserId);
+                    var code = CurrentUser.RegisterEotc(user.Mail, "''","''","''", uid, pid, user.PassWord);
+                    if(code <= 0)
                         return InvokeResult.Fail("otc用户注册失败!");
                 }
             }
@@ -561,22 +575,21 @@ namespace DID.Services
             //    refUser.AirdropEotc += refeotc;
             //    await db.UpdateAsync(refUser);
             //}
-
             db.CompleteTransaction();
-
 
             //调用otc注册
             if (!string.IsNullOrEmpty(login.RefUserId))
             {
                 var uid = await db.SingleOrDefaultAsync<string>("select UId from DIDUser where DIDUserId = @0 and IsLogout = 0", userId);
                 var pid = await db.SingleOrDefaultAsync<string>("select UId from DIDUser where DIDUserId = @0 and IsLogout = 0", login.RefUserId);
-                var code = CurrentUser.RegisterEotc(login.Mail!, 
-                                                    string.IsNullOrEmpty(login.WalletAddress)?"''": login.WalletAddress,
+                var code = CurrentUser.RegisterEotc(login.Mail!,
+                                                    string.IsNullOrEmpty(login.WalletAddress) ? "''" : login.WalletAddress,
                                                     string.IsNullOrEmpty(login.Sign) ? "''" : login.Sign,
-                                                    string.IsNullOrEmpty(login.Otype) ? "''" : login.Otype, uid, pid);
-                if(code == -1)
+                                                    string.IsNullOrEmpty(login.Otype) ? "''" : login.Otype, uid, pid, login.Password!);
+                if (code <= 0)
                     return InvokeResult.Fail("otc用户注册失败!");
             }
+            
 
             return InvokeResult.Success("用户注册成功!");
         }
@@ -617,7 +630,17 @@ namespace DID.Services
         public async Task<Response> ChangePassword(string userId, string newPassWord)
         {
             using var db = new NDatabase();
+            var user = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
+            if (null == user)
+                return InvokeResult.Fail("用户信息未找到!");
+            if (!string.IsNullOrEmpty(user.RefUserId))
+            {
+                var code = CurrentUser.ChangePassword(userId, newPassWord);
+                if (code <= 0)
+                    return InvokeResult.Fail("otc修改密码失败!");
+            }
             await db.ExecuteAsync("update DIDUser set PassWord = @0 where DIDUserId = @1", newPassWord, userId);
+            
             return InvokeResult.Success("修改成功!");
         }
 
@@ -630,7 +653,18 @@ namespace DID.Services
         public async Task<Response> RetrievePassword(string mail, string newPassWord)
         {
             using var db = new NDatabase();
+            var user = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where Mail = @0", mail);
+            if(null == user)
+                return InvokeResult.Fail("用户信息未找到!");
+            if (!string.IsNullOrEmpty(user.RefUserId))
+            {
+                var code = CurrentUser.ChangePassword(user.DIDUserId, newPassWord);
+                if (code <= 0)
+                    return InvokeResult.Fail("otc修改密码失败!");
+            }
+
             await db.ExecuteAsync("update DIDUser set PassWord = @0 where Mail = @1", newPassWord, mail);
+
             return InvokeResult.Success("修改成功!");
         }
 
@@ -650,11 +684,14 @@ namespace DID.Services
             if(!string.IsNullOrEmpty(user))
                 return InvokeResult.Fail("邮箱已注册!");//邮箱已注册!
             await db.ExecuteAsync("update DIDUser set mail = @0 where DIDUserId = @1", item.Mail, userId);
+            var code = CurrentUser.ChangeMail(userId, item.Mail);
+            if (code <= 0)
+                return InvokeResult.Fail("otc修改邮箱失败!");
             return InvokeResult.Success("修改成功!");
         }
 
         //48小时后注销
-        private readonly System.Timers.Timer t = new(172800000);//实例化Timer类，设置间隔时间为10000毫秒；
+        //private readonly System.Timers.Timer t = new(48 * 60 * 60 * 1000);//实例化Timer类，设置间隔时间为10000毫秒；
         //private readonly System.Timers.Timer t = new(5 * 60 * 1000);
         /// <summary>
         /// 用户注销
@@ -688,27 +725,39 @@ namespace DID.Services
 
             await db.ExecuteAsync("update DIDUser set UserLogoutId = @0 where DIDUserId = @1", item.UserLogoutId, userId);
 
-            t.Elapsed += new System.Timers.ElapsedEventHandler(async (object? source, System.Timers.ElapsedEventArgs e) =>
-            {
-                t.Stop(); //先关闭定时器
+            //注销时间默认48小时
+            var hours = Convert.ToInt32(_reservice.GetRewardValue("LogoutHours").Result.Items);
+            var timer = new Timers { 
+                TimersId = Guid.NewGuid().ToString(), 
+                Rid = item.UserLogoutId, 
+                CreateDate = DateTime.Now, 
+                StartTime = DateTime.Now, 
+                EndTime = DateTime.Now.AddHours(hours) 
+            };
+            await db.InsertAsync(timer);
+            TimersHelp.LogoutTimer(timer);
 
-                var nowItem = await db.SingleOrDefaultByIdAsync<UserLogout>(item.UserLogoutId);
-                if (nowItem.IsCancel == IsEnum.否)
-                {
-                    nowItem.LogoutDate = DateTime.Now;
-                    await db.UpdateAsync(nowItem);
-                    await db.ExecuteAsync("update DIDUser set IsLogout = @0 where DIDUserId = @1", IsEnum.是, userId);//注销账号
-                    await db.ExecuteAsync("update Wallet set IsLogout = @0 where DIDUserId = @1", IsEnum.是, userId);//注销钱包
-                    var refUserId = await db.SingleOrDefaultAsync<string>("select RefUserId from DIDUser where DIDUserId = @0 and IsLogout = 0", userId);
-                    if (!string.IsNullOrEmpty(refUserId))
-                        await db.ExecuteAsync("update DIDUser set RefUserId = @0 where RefUserId = @1 and IsLogout = 0", refUserId, userId);//更新邀请人为当前用户的上级
-                }
-            });//到达时间的时候执行事件；
-            t.AutoReset = false;//设置是执行一次（false）还是一直执行(true)；
-            t.Enabled = true;//是否执行System.Timers.Timer.Elapsed事件；
-            t.Start(); //启动定时器
+            //t.Elapsed += new System.Timers.ElapsedEventHandler(async (object? source, System.Timers.ElapsedEventArgs e) =>
+            //{
+            //    t.Stop(); //先关闭定时器
 
-            db.CompleteTransaction();
+            //    var nowItem = await db.SingleOrDefaultByIdAsync<UserLogout>(item.UserLogoutId);
+            //    if (nowItem.IsCancel == IsEnum.否)
+            //    {
+            //        nowItem.LogoutDate = DateTime.Now;
+            //        await db.UpdateAsync(nowItem);
+            //        await db.ExecuteAsync("update DIDUser set IsLogout = @0 where DIDUserId = @1", IsEnum.是, userId);//注销账号
+            //        await db.ExecuteAsync("update Wallet set IsLogout = @0 where DIDUserId = @1", IsEnum.是, userId);//注销钱包
+            //        var refUserId = await db.SingleOrDefaultAsync<string>("select RefUserId from DIDUser where DIDUserId = @0 and IsLogout = 0", userId);
+            //        if (!string.IsNullOrEmpty(refUserId))
+            //            await db.ExecuteAsync("update DIDUser set RefUserId = @0 where RefUserId = @1 and IsLogout = 0", refUserId, userId);//更新邀请人为当前用户的上级
+            //    }
+            //});//到达时间的时候执行事件；
+            //t.AutoReset = false;//设置是执行一次（false）还是一直执行(true)；
+            //t.Enabled = true;//是否执行System.Timers.Timer.Elapsed事件；
+            //t.Start(); //启动定时器
+
+            //db.CompleteTransaction();
             return InvokeResult.Success("提交注销成功!");
         }
 
@@ -847,7 +896,7 @@ namespace DID.Services
             var user = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
             if (null == user)
                 return InvokeResult.Fail<double>("用户信息未找到!");
-            var eotc = CurrentUser.GetEotc(user.DIDUserId);
+            var eotc = CurrentUser.GetEUModel(user.DIDUserId)?.StakeEotc ?? 0;
             return InvokeResult.Success(eotc);
         }
 

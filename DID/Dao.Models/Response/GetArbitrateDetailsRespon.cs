@@ -99,6 +99,14 @@ namespace Dao.Models.Response
         }
 
         /// <summary>
+        /// 投票记录
+        /// </summary>
+        public List<ArbitrateVote>? AVotes
+        {
+            get; set;
+        }
+
+        /// <summary>
         /// 举证截至日期
         /// </summary>
         public DateTime AdduceDate

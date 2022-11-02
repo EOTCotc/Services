@@ -182,5 +182,26 @@ namespace DID.Models.Response
         {
             get; set;
         }
+        /// <summary>
+        /// E积分
+        /// </summary>
+        public double EOTC
+        {
+            get; set;
+        }
+        /// <summary>
+        /// u积分
+        /// </summary>
+        public double USDT
+        {
+            get; set;
+        }
+        /// <summary>
+        /// 质押数量
+        /// </summary>
+        public double StakeEotc
+        {
+            get; set;
+        }
     }
 }

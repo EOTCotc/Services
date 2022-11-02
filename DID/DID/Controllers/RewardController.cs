@@ -37,7 +37,7 @@ namespace DID.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("getrewardvalue")]
-        public async Task<Response<double>> GetRewardValue(string key)
+        public async Task<Response<string>> GetRewardValue(string key)
         {
             return await _service.GetRewardValue(key);
         }

@@ -22,6 +22,11 @@ namespace DID.Models.Response
         {
             get; set;
         }
+
+        public double StakeEotc
+        {
+            get; set;
+        }
     }
 
     public class CodeModel

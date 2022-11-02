@@ -228,10 +228,10 @@ namespace DID.Services
         public async Task<Response<ComAddrRespon>> GetComAddr()
         {
             using var db = new NDatabase();
-            var country_list = await db.FetchAsync<Area>("select Distinct a.Country code, b.Name from Community a left join Area b on a.Country = b.Code where AuthType = @0", AuthTypeEnum.审核成功);
-            var province_list = await db.FetchAsync<Area>("select Distinct a.Province code, b.Name from Community a left join Area b on a.Province = b.Code where AuthType = @0", AuthTypeEnum.审核成功);
-            var city_list = await db.FetchAsync<Area>("select Distinct a.City code, b.Name from Community a left join Area b on a.City = b.Code where AuthType = @0", AuthTypeEnum.审核成功);
-            var county_list = await db.FetchAsync<Area>("select Distinct a.Area code, b.Name from Community a left join Area b on a.Area = b.Code where AuthType = @0", AuthTypeEnum.审核成功);
+            var country_list = await db.FetchAsync<Area>("select Distinct a.Country code, b.Name from Community a left join Area b on a.Country = b.Code where a.AuthType = 2 and a.Country is not null");
+            var province_list = await db.FetchAsync<Area>("select Distinct a.Province code, b.Name from Community a left join Area b on a.Province = b.Code where a.AuthType = 2 and a.Province is not null");
+            var city_list = await db.FetchAsync<Area>("select Distinct a.City code, b.Name from Community a left join Area b on a.City = b.Code where a.AuthType = 2 and a.City is not null");
+            var county_list = await db.FetchAsync<Area>("select Distinct a.Area code, b.Name from Community a left join Area b on a.Area = b.Code where a.AuthType = 2 and a.Area is not null");
 
             var country = new Dictionary<string, string>();
             country_list.ForEach(a => country.Add(a.code, a.name));
@@ -305,8 +305,10 @@ namespace DID.Services
             item.CommunityId = Guid.NewGuid().ToString();
 
             var user = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", item.DIDUserId);
+            if(null == user)
+                return InvokeResult.Fail<string>("用户信息未找到!");
             //质押5000EOTC
-            var eotc = CurrentUser.GetEotc(user.DIDUserId);
+            var eotc = CurrentUser.GetEUModel(user.DIDUserId)?.StakeEotc??0;
             if (eotc < 5000)
                 return InvokeResult.Fail<string>("质押EOTC数量不足!");
             if (!string.IsNullOrEmpty(user.ApplyCommunityId))
@@ -344,7 +346,20 @@ namespace DID.Services
             db.CompleteTransaction();
 
             //Dao审核
-            ToDaoAuth(auth, item.DIDUserId!);
+            //ToDaoAuth(auth, item.DIDUserId!);
+
+            //默认2小时去Dao
+            var hours = Convert.ToInt32(_reservice.GetRewardValue("ComAuthHours").Result.Items);
+            var timer = new Timers { 
+                TimersId = Guid.NewGuid().ToString(), 
+                Rid = auth.ComAuthId, 
+                CreateDate = DateTime.Now, 
+                StartTime = DateTime.Now, 
+                EndTime = DateTime.Now.AddHours(hours), 
+                TimerType = TimerTypeEnum.社区审核 
+            };
+            await db.InsertAsync(timer);
+            TimersHelp.ComAuthTimer(timer);
 
             return InvokeResult.Success<string>(item.CommunityId);
         }
@@ -360,7 +375,7 @@ namespace DID.Services
             if(null == model)
                 return InvokeResult.Fail("社区未找到!");
             //一年只能修改两次社区位置
-            if(!string.IsNullOrEmpty(item.AddressName) && model.UpdateNum == 2 && model.UpdateDate.Year == DateTime.Now.Year)
+            if(!string.IsNullOrEmpty(item.AddressName) && model.UpdateNum == 2 && null != model.UpdateDate && model.UpdateDate?.Year == DateTime.Now.Year)
                 return InvokeResult.Fail("社区位置一年只能修改2次!");
             model.Image = item.Image;
             model.Describe = item.Describe;
@@ -444,7 +459,7 @@ namespace DID.Services
                 {
                     if (!string.IsNullOrEmpty(list[i].ApplyCommunityId)&& i > 0)//除自己到下个社区之间的用户
                         break;
-                    await db.ExecuteAsync("update UserCommunity set CommunityId = @0, CreateDate = @2  where DIDUserId = @1", communityId, list[i].DIDUser, DateTime.Now);
+                    await db.ExecuteAsync("update UserCommunity set CommunityId = @0, CreateDate = @2  where DIDUserId = @1", communityId, list[i].DIDUserId, DateTime.Now);
                 }
             }
             else if (auth.AuditType != AuditTypeEnum.审核通过)
@@ -497,7 +512,19 @@ namespace DID.Services
                 await db.InsertAsync(nextAuth);
 
                 //Dao审核
-                ToDaoAuth(nextAuth, authinfo.DIDUserId!);
+                //ToDaoAuth(nextAuth, authinfo.DIDUserId!);
+
+                var hours = Convert.ToInt32(_reservice.GetRewardValue("ComAuthHours").Result.Items);
+                var timer = new Timers { 
+                    TimersId = Guid.NewGuid().ToString(),
+                    Rid = nextAuth.ComAuthId,
+                    CreateDate = DateTime.Now, 
+                    StartTime = DateTime.Now,
+                    EndTime = DateTime.Now.AddHours(hours), 
+                    TimerType = TimerTypeEnum.社区审核
+                };
+                await db.InsertAsync(timer);
+                TimersHelp.ComAuthTimer(timer);
             }
             else if (auth.AuditStep == AuditStepEnum.二审 && auth.AuditType == AuditTypeEnum.审核通过)
             {
@@ -529,7 +556,7 @@ namespace DID.Services
             //奖励EOTC 10
             if (isDao)
             {
-                var eotc = _reservice.GetRewardValue("ComAudit").Result.Items;//奖励eotc数量
+                var eotc = Convert.ToDouble(_reservice.GetRewardValue("ComAudit").Result.Items);//奖励eotc数量
                 var detail = new IncomeDetails()
                 {
                     IncomeDetailsId = Guid.NewGuid().ToString(),
@@ -824,7 +851,7 @@ namespace DID.Services
         {
             //两小时没人审核 自动到Dao审核
             //var t = new System.Timers.Timer(60000);//实例化Timer类，设置间隔时间为10000毫秒；
-            var t = new System.Timers.Timer(2 * 24 * 60 * 60 * 1000);
+            var t = new System.Timers.Timer(2 * 60 * 60 * 1000);
             t.Elapsed += new System.Timers.ElapsedEventHandler(async (object? source, System.Timers.ElapsedEventArgs e) =>
             {
                 t.Stop(); //先关闭定时器
