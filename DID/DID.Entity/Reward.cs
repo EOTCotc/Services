@@ -22,6 +22,14 @@ namespace DID.Entitys
             get; set;
         }
 
+        /// <summary>
+        /// 标题
+        /// </summary>
+        public string Title
+        {
+            get; set;
+        }
+
     }
 
 }

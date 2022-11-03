@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Dao.Models\Dao.Models.csproj" />
     <ProjectReference Include="..\DID.Common\DID.Common.csproj" />
+    <ProjectReference Include="..\DID.Services\DID.Services.csproj" />
   </ItemGroup>
 
 </Project>

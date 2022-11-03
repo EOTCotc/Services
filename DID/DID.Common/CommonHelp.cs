@@ -208,7 +208,7 @@ namespace DID.Common
             {
                 var index = str.Length;
                 str = str.Substring(0, 1);
-                for (var i = 1; i < index; i++)
+                for (var i = 0; i < 2; i++)
                     str += '*';
             }
             return str;

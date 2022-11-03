@@ -15,12 +15,11 @@ public class CurrentUser : ICurrentUser
 {
     private readonly HttpContext _httpContext;
 
-    private static ILogger<CurrentUser> _logger;
+    private static ILogger<CurrentUser> _logger = IocManager.Resolve<ILogger<CurrentUser>>();
 
-    public CurrentUser(IHttpContextAccessor httpContextAccessor, ILogger<CurrentUser> logger)
+    public CurrentUser(IHttpContextAccessor httpContextAccessor)
     {
         _httpContext = httpContextAccessor.HttpContext;
-        _logger = logger;
     }
 
     /// <summary>
@@ -89,7 +88,7 @@ public class CurrentUser : ICurrentUser
     }
 
     /// <summary>
-    /// 获取EOTC数量
+    /// 获取EOTC质押数量
     /// </summary>
     /// <returns></returns>
     public static double GetEotc(string userId)
@@ -101,10 +100,10 @@ public class CurrentUser : ICurrentUser
             if (null == user)
                 return 0;
             var client = new RestClient();
-            var request = new RestRequest(string.Format("https://api.eotcyu.club/api/OTC/QueryPoints?uid={0}&pwd={1}", user.Uid, user.PassWord), Method.Post);
+            var request = new RestRequest(string.Format("https://api.eotcyu.club/api/DID/QueryPoints?uid={0}&pwd={1}", user.Uid, user.PassWord), Method.Post);
             var response = client.Execute(request);
             var model = JsonExtensions.DeserializeFromJson<EUModel>(response.Content);
-            return model.EOTC;
+            return model.StakeEotc;
         }
         catch
         {
@@ -116,15 +115,15 @@ public class CurrentUser : ICurrentUser
     /// 用户注册EOTC
     /// </summary>
     /// <returns></returns>
-    public static int RegisterEotc(string mail,string ads, string sign, string net, string uid, string pid)
+    public static int RegisterEotc(string mail,string ads, string sign, string net, string uid, string pid, string pwd)
     {
         try
         {
             using var db = new NDatabase();
 
             var client = new RestClient();
-            var request = new RestRequest(string.Format("https://api.eotcyu.club/api/OTC/RegisterEotc?mail={0}&ads={1}&sign={2}&net={3}&uid={4}&pid={5}",
-                                        mail, ads, sign, net, uid, pid), Method.Post);
+            var request = new RestRequest(string.Format("https://api.eotcyu.club/api/DID/RegisterEotc?mail={0}&ads={1}&sign={2}&net={3}&uid={4}&pid={5}&pwd={6}",
+                                        mail, ads, sign, net, uid, pid, pwd), Method.Post);
             var response = client.Execute(request);
             var model = JsonExtensions.DeserializeFromJson<CodeModel>(response.Content);
             //Console.WriteLine(response.Content);
@@ -149,7 +148,7 @@ public class CurrentUser : ICurrentUser
             if (null == user)
                 return 0;
             var client = new RestClient();
-            var request = new RestRequest(string.Format("https://api.eotcyu.club/api/OTC/QueryPoints?uid={0}&pwd={1}", user.Uid, user.PassWord), Method.Post);
+            var request = new RestRequest(string.Format("https://api.eotcyu.club/api/DID/QueryPoints?uid={0}&pwd={1}", user.Uid, user.PassWord), Method.Post);
             var response = client.Execute(request);
             var model = JsonExtensions.DeserializeFromJson<EUModel>(response.Content);
             return model.Airdrop;
@@ -157,6 +156,105 @@ public class CurrentUser : ICurrentUser
         catch
         {
             return 0;
+        }
+    }
+
+    /// <summary>
+    /// 获取EOTC数据
+    /// </summary>
+    /// <returns></returns>
+    public static EUModel? GetEUModel(string userId)
+    {
+        try
+        {
+            using var db = new NDatabase();
+            var user = db.SingleOrDefault<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
+            if (null == user)
+                return null;
+            var client = new RestClient();
+            var request = new RestRequest(string.Format("https://api.eotcyu.club/api/DID/QueryPoints?uid={0}&pwd={1}", user.Uid, user.PassWord), Method.Post);
+            var response = client.Execute(request);
+            var model = JsonExtensions.DeserializeFromJson<EUModel>(response.Content);
+            return model;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// eotc认证
+    /// </summary>
+    /// <returns></returns>
+    public static int Authentication(string userId, UserAuthInfo auth)
+    {
+        try
+        {
+            using var db = new NDatabase();
+            var user = db.SingleOrDefault<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
+            if (null == user)
+                return -1;
+            var client = new RestClient();
+            var request = new RestRequest(string.Format("https://api.eotcyu.club/api/DID/Authentication?uid={0}&pwd={1}&name={2}&tel={3}&cid={4}",
+                                                         user.Uid,user.PassWord,auth.Name,auth.PhoneNum,auth.IdCard), Method.Post);
+            var response = client.Execute(request);
+            var model = JsonExtensions.DeserializeFromJson<CodeModel>(response.Content);
+            return model.Code;
+        }
+        catch
+        {
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// eotc修改密码
+    /// </summary>
+    /// <returns></returns>
+    public static int ChangePassword(string userId, string newPassWord)
+    {
+        try
+        {
+            using var db = new NDatabase();
+            var user = db.SingleOrDefault<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
+            if (null == user)
+                return -1;
+            var client = new RestClient();
+            var request = new RestRequest(string.Format("https://api.eotcyu.club/api/DID/UpdatePwd?uid={0}&oldPwd={1}&newPwd={2}",
+                                                         user.Uid, user.PassWord, newPassWord), Method.Post);
+            var response = client.Execute(request);
+            var model = JsonExtensions.DeserializeFromJson<CodeModel>(response.Content);
+            return model.Code;
+        }
+        catch
+        {
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// eotc修改邮箱
+    /// </summary>
+    /// <returns></returns>
+    public static int ChangeMail(string userId, string newmail)
+    {
+        try
+        {
+            using var db = new NDatabase();
+            var user = db.SingleOrDefault<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
+            if (null == user)
+                return -1;
+            var client = new RestClient();
+            var request = new RestRequest(string.Format("https://api.eotcyu.club/api/DID/UpdateMail?uid={0}&pwd={1}&mail={2}",
+                                                         user.Uid, user.PassWord, newmail), Method.Post);
+            var response = client.Execute(request);
+            var model = JsonExtensions.DeserializeFromJson<CodeModel>(response.Content);
+            return model.Code;
+        }
+        catch
+        {
+            return -1;
         }
     }
 }

@@ -10,6 +10,7 @@ using DID.Models.Request;
 using DID.Services;
 using Microsoft.Extensions.Logging;
 using NPoco;
+using TimersHelp = Dao.Common.TimersHelp;
 
 namespace Dao.Services
 {
@@ -367,6 +368,8 @@ namespace Dao.Services
                 });
             });
             model.Votes = votes;
+ 
+            model.AVotes = users;
 
             model.VoteStatus = await db.SingleOrDefaultAsync<VoteStatusEnum>("select VoteStatus from ArbitrateVote where ArbitrateInfoId = @0 and VoteUserId = @1", item.ArbitrateInfoId, userId);
 
@@ -416,18 +419,21 @@ namespace Dao.Services
                 return InvokeResult.Fail("原告信息未找到!");
             if (null == defendantUser)
                 return InvokeResult.Fail("被告信息未找到!");
-            
+            var voteHours = Convert.ToInt32(_reservice.GetRewardValue("VoteHours").Result.Items);
+            var adduceHours = Convert.ToInt32(_reservice.GetRewardValue("AdduceHours").Result.Items);
             var item = new ArbitrateInfo
             {
                 ArbitrateInfoId = Guid.NewGuid().ToString(),
                 CreateDate = DateTime.Now,
-                AdduceDate = DateTime.Now.AddMinutes(5),//AddDays(3),
+                AdduceDate = DateTime.Now.AddHours(adduceHours),//举证3三天
+                //AdduceDate = DateTime.Now.AddMinutes(5),
                 Defendant = defendantUser.DIDUserId,
                 OrderId = orderId,
                 Plaintiff = plaintiffUser.DIDUserId,
                 Number = num,
                 Status = ArbitrateStatusEnum.举证中,
-                VoteDate = DateTime.Now.AddMinutes(10),//AddDays(6),
+                VoteDate = DateTime.Now.AddHours(voteHours),//投票3天
+                //VoteDate = DateTime.Now.AddMinutes(5),
                 ArbitrateInType = type
             };
 
@@ -488,8 +494,21 @@ namespace Dao.Services
             db.CompleteTransaction();
 
             //默认3天举证时间
-            ToDelay(item.ArbitrateInfoId, 3 * 24 * 3600 * 1000);
+            //ToDelay(item.ArbitrateInfoId, 3 * 24 * 3600 * 1000);
             //ToDelay(item.ArbitrateInfoId, 10 * 60 * 1000);
+            //默认3天举证时间
+            //var adduceHours = Convert.ToInt32(_reservice.GetRewardValue("AdduceHours").Result.Items);
+            var adduceTimer = new Timers { 
+                TimersId = Guid.NewGuid().ToString(), 
+                Rid = item.ArbitrateInfoId, 
+                CreateDate = DateTime.Now,
+                StartTime = DateTime.Now, 
+                EndTime = DateTime.Now.AddHours(adduceHours),
+                //EndTime = DateTime.Now.AddMinutes(5),
+                TimerType = TimerTypeEnum.仲裁举证
+            };
+            await db.InsertAsync(adduceTimer);
+            TimersHelp.ArbitrateAdduceTimer(adduceTimer);
 
             return InvokeResult.Success("提交成功!");
         }
@@ -675,7 +694,7 @@ namespace Dao.Services
                     if (a.VoteStatus == (arbitrate.Status == ArbitrateStatusEnum.原告胜 ? VoteStatusEnum.原告胜 : VoteStatusEnum.被告胜) )
                     {
                         var model = db.SingleOrDefault<UserArbitrate>("select * from UserArbitrate where DIDUserId = @0 and IsDelete = 0", a.VoteUserId);
-                        var eotc = _reservice.GetRewardValue("Arbitration").Result.Items;//奖励eotc数量
+                        var eotc = Convert.ToDouble(_reservice.GetRewardValue("Arbitration").Result.Items);//奖励eotc数量
                         model.VictoryNum += 1;
                         model.EOTC += eotc;
                         db.Update(model);
@@ -739,10 +758,10 @@ namespace Dao.Services
                     t1.Elapsed += new System.Timers.ElapsedEventHandler((object? source, System.Timers.ElapsedEventArgs e) =>
                     {
                         t1.Stop(); //先关闭定时器
-                        using var db = new NDatabase();
+                        using var db = new NDatabase(); 
                         var item = db.SingleOrDefaultById<ArbitrateInfo>(arbitrateInfoId);
                         var uservotes = db.Fetch<ArbitrateVote>("select * from ArbitrateVote where ArbitrateInfoId = @0 and IsDelete = 0", arbitrateInfoId);//全部投票信息
-                                                                                                                                                            //原告票数
+                        //原告票数
                         var ynum = uservotes.Where(a => a.VoteStatus == VoteStatusEnum.原告胜).Count();
                         //被告票数
                         var bnum = uservotes.Where(a => a.VoteStatus == VoteStatusEnum.被告胜).Count();
@@ -793,7 +812,7 @@ namespace Dao.Services
                                 if (a.VoteStatus == (item.Status == ArbitrateStatusEnum.原告胜 ? VoteStatusEnum.原告胜 : VoteStatusEnum.被告胜))
                                 {
                                     var model = db.SingleOrDefault<UserArbitrate>("select * from UserArbitrate where DIDUserId = @0 and IsDelete = 0", a.VoteUserId);
-                                    var eotc = _reservice.GetRewardValue("Arbitration").Result.Items;//奖励eotc数量
+                                    var eotc = Convert.ToDouble(_reservice.GetRewardValue("Arbitration").Result.Items);//奖励eotc数量
                                     model.VictoryNum += 1;
                                     model.EOTC += eotc;
                                     db.Update(model);
@@ -850,9 +869,9 @@ namespace Dao.Services
 
                                 db.Insert(newvote);
                             });
-
-                            //item.VoteDate = item.VoteDate.AddDays(3);//投票时间延长3天
-                            item.VoteDate = item.VoteDate.AddMinutes(5);//投票时间延长3天
+                            var voteHours = Convert.ToInt32(_reservice.GetRewardValue("VoteHours").Result.Items);
+                            item.VoteDate = item.VoteDate.AddHours(voteHours);//投票时间延长3天
+                            //item.VoteDate = item.VoteDate.AddMinutes(5);//投票时间延长3天
                             db.Update(item);
                             //重新启动投票定时器
                             t1.AutoReset = false;

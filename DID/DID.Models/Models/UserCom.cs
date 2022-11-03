@@ -8,7 +8,7 @@ namespace DID.Models.Models
 {
     public class UserCom
     {
-        public string DIDUser
+        public string DIDUserId
         {
             get; set;
         }

@@ -174,7 +174,7 @@ namespace DID.Entitys
         /// <summary>
         /// 修改时间
         /// </summary>
-        public DateTime UpdateDate
+        public DateTime? UpdateDate
         {
             get; set;
         }

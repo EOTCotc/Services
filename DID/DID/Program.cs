@@ -52,6 +52,8 @@ builder.Host
   .Where(t => t.Name.EndsWith("Service"))
   .AsImplementedInterfaces();
 });
+
+
 #endregion
 
 #region IpRateLimit
@@ -176,9 +178,42 @@ builder.Services.AddCors(c =>
 });
 #endregion
 
+#region 重启定时器
+
+using var db = new NDatabase();
+
+var timers = db.Fetch<DID.Entitys.Timers>("select * from Timers where StartTime <= @0 and EndTime >= @0", DateTime.Now);
+
+foreach (var item in timers)
+{
+    switch (item.TimerType)
+    {
+        case DID.Entitys.TimerTypeEnum.注销:
+            TimersHelp.LogoutTimer(item);
+            break;
+        case DID.Entitys.TimerTypeEnum.身份审核:
+            TimersHelp.AuthTimer(item);
+            break;
+        case DID.Entitys.TimerTypeEnum.社区审核:
+            TimersHelp.ComAuthTimer(item);
+            break;
+        case DID.Entitys.TimerTypeEnum.仲裁举证:
+            Dao.Common.TimersHelp.ArbitrateAdduceTimer(item);
+            break;
+        case DID.Entitys.TimerTypeEnum.仲裁投票:
+            Dao.Common.TimersHelp.ArbitrateVoteTimer(item);
+            break;
+    }
+}
+
+#endregion
+
+
 //builder.Services.AddControllers(options => options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true);//请求参数为空判断
 
 var app = builder.Build();
+
+IocManager.InitContainer(app.Services.GetAutofacRoot());
 
 // Configure the HTTP request pipeline.
 //if (app.Environment.IsDevelopment())
@@ -225,7 +260,7 @@ app.UseExceptionHandler(builder =>
         if (exception != null)
         {
             app.Logger.LogError(exception.Error.Message);
-            var error = new Response { Code = 1, Message = "服务器错误!" };
+            var error = new { code = 1, message = "服务器错误!" };
             var errObj = JsonConvert.SerializeObject(error);
             await context.Response.WriteAsync(errObj).ConfigureAwait(false);
         }

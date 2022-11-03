@@ -73,7 +73,7 @@ namespace DID.Controllers
             if (req.Type != PayType.现金支付)
             {
                 var usercode = _cache.Get(mail)?.ToString();
-
+                _cache.Remove(mail);
                 if (usercode != code)
                     return InvokeResult.Fail<string>("1");//验证码错误!
             }

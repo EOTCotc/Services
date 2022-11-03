@@ -22,7 +22,7 @@ namespace DID.Services
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        Task<Response<double>> GetRewardValue(string key);
+        Task<Response<string>> GetRewardValue(string key);
 
         /// <summary>
         /// 获取收益设置
@@ -85,13 +85,13 @@ namespace DID.Services
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        public async Task<Response<double>> GetRewardValue(string key)
+        public async Task<Response<string>> GetRewardValue(string key)
         {
             using var db = new NDatabase();
 
-            var value = await db.SingleOrDefaultAsync<double>("select RewardValue from Reward where RewardKey = @0", key);
+            var value = await db.SingleOrDefaultAsync<string>("select RewardValue from Reward where RewardKey = @0", key);
 
-            return InvokeResult.Success(value);
+            return InvokeResult.Success<string>(value);
         }
 
         /// <summary>
