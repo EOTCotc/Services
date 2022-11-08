@@ -118,7 +118,7 @@ namespace DID.Controllers
                 //return InvokeResult.Fail<string>("1");//邮箱格式错误!
                 return InvokeResult.Fail<string>("邮箱格式错误!");
             var code = _cache.Get(login.Mail)?.ToString();
-            _cache.Remove(login.Mail);
+            //_cache.Remove(login.Mail);
             if (code != login.Code)
                 //return InvokeResult.Fail<string>("2");//验证码错误!
                 return InvokeResult.Fail<string>("验证码错误!");
@@ -155,7 +155,7 @@ namespace DID.Controllers
         public async Task<Response> ChangePassword(ChangePasswordReq req)
         {
             var usercode = _cache.Get(req.Mail)?.ToString();
-            _cache.Remove(req.Mail);
+            //_cache.Remove(req.Mail);
             if (usercode != req.Code)
                 //return InvokeResult.Fail<string>("1"); //验证码错误!
                 return InvokeResult.Fail<string>("验证码错误!");
@@ -173,7 +173,7 @@ namespace DID.Controllers
         public async Task<Response> RetrievePassword(ChangePasswordReq req)
         {
             var usercode = _cache.Get(req.Mail)?.ToString();
-            _cache.Remove(req.Mail);
+            //_cache.Remove(req.Mail);
             if (usercode != req.Code)
                 //return InvokeResult.Fail<string>("1"); //验证码错误!
                 return InvokeResult.Fail<string>("验证码错误!");
@@ -190,7 +190,7 @@ namespace DID.Controllers
         public async Task<Response> ChangeMail(ChangeMailReq req)
         {
             var usercode = _cache.Get(req.Mail)?.ToString();
-            _cache.Remove(req.Mail);
+            //_cache.Remove(req.Mail);
             if (usercode != req.Code)
                 //return InvokeResult.Fail<string>("3"); //验证码错误!
                 return InvokeResult.Fail<string>("验证码错误!");
@@ -218,7 +218,7 @@ namespace DID.Controllers
         public async Task<Response> Logout(LogoutReq req)
         {
             var usercode = _cache.Get(req.Mail)?.ToString();
-            _cache.Remove(req.Mail);
+            //_cache.Remove(req.Mail);
             if (usercode != req.Code)
                 //return InvokeResult.Fail<string>("1"); //验证码错误!
                 return InvokeResult.Fail<string>("验证码错误!");
@@ -324,7 +324,7 @@ namespace DID.Controllers
         public async Task<Response> SetPayPassWord(SetPayPassWordReq req)
         {
             var usercode = _cache.Get(req.Mail)?.ToString();
-            _cache.Remove(req.Mail);
+            //_cache.Remove(req.Mail);
             if (usercode != req.Code)
                 //return InvokeResult.Fail<string>("1"); //验证码错误!
                 return InvokeResult.Fail<string>("验证码错误!");

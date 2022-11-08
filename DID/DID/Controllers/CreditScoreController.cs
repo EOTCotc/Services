@@ -4,6 +4,7 @@ using DID.Models.Base;
 using DID.Models.Request;
 using DID.Models.Response;
 using DID.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DID.Controllers
@@ -60,6 +61,19 @@ namespace DID.Controllers
         public async Task<Response<GetCreditScoreRespon>> GetCreditScore(long page, long itemsPerPage, TypeEnum type)
         {
             return await _service.GetCreditScore(_currentUser.UserId, page, itemsPerPage, type);
+        }
+
+        /// <summary>
+        /// 获取用户信用分
+        /// </summary>
+        /// <param name="uId"></param>
+        /// <returns></returns>
+        [HttpGet]
+        [Route("getcreditscorebyuid")]
+        [AllowAnonymous]
+        public async Task<int> GetCreditScoreByUid(string uId)
+        {
+            return await _service.GetCreditScoreByUid(uId);
         }
 
     }

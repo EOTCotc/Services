@@ -157,7 +157,7 @@ namespace DID.Controllers
         /// <returns> </returns>
         [HttpGet]
         [Route("getcommunityinfo")]
-        public async Task<Response<Community>> GetCommunityInfo()
+        public async Task<Response<GetCommunityInfoRespon>> GetCommunityInfo()
         {
             return await _service.GetCommunityInfo(_currentUser.UserId);
         }
@@ -168,7 +168,7 @@ namespace DID.Controllers
         /// <returns> </returns>
         [HttpGet]
         [Route("getcommunityinfobyid")]
-        public async Task<Response<Community>> GetCommunityInfoById(string communityId)
+        public async Task<Response<GetCommunityInfoRespon>> GetCommunityInfoById(string communityId)
         {
             return await _service.GetCommunityInfoById(communityId);
         }
@@ -223,6 +223,17 @@ namespace DID.Controllers
         public async Task<Response<List<AuthInfo>>> GetComAuthFail(string communityId)
         {
             return await _service.GetComAuthFail(communityId);
+        }
+
+        /// <summary>
+        /// 社区名是否重复
+        /// </summary>
+        /// <returns> </returns>
+        [HttpGet]
+        [Route("hascomname")]
+        public async Task<Response<bool>> HasComName(string comName)
+        {
+            return await _service.HasComName(comName);
         }
     }
 }

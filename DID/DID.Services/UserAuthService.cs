@@ -133,36 +133,36 @@ namespace DID.Services
             //修改用户审核状态
             if (auth.AuditStep == AuditStepEnum.抽审 && auth.AuditType == AuditTypeEnum.审核通过)
             {
-                await db.ExecuteAsync("update DIDUser set AuthType = @1 where DIDUserId = @0", authinfo.CreatorId, AuthTypeEnum.审核成功);
+                //await db.ExecuteAsync("update DIDUser set AuthType = @1 where DIDUserId = @0", authinfo.CreatorId, AuthTypeEnum.审核成功);
 
-                //eotc认证
-                var code = CurrentUser.Authentication(userId, authinfo);
-                if (code <= 0)
-                    return InvokeResult.Fail("otc用户认证失败!");
+                ////eotc认证
+                //var code = CurrentUser.Authentication(userId, authinfo);
+                //if (code <= 0)
+                //    return InvokeResult.Fail("otc用户认证失败!");
 
-                //加信用分 用户+8 邀请人+1 节点+1
-                var user = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", authinfo.CreatorId);
-                _csservice.CreditScore(new CreditScoreReq { Fraction = 8, Remarks ="完成强关系链认证", Type= TypeEnum.加分, Uid =  user.Uid});
+                ////加信用分 用户+8 邀请人+1 节点+1
+                //var user = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", authinfo.CreatorId);
+                //_csservice.CreditScore(new CreditScoreReq { Fraction = 8, Remarks ="完成强关系链认证", Type= TypeEnum.加分, Uid =  user.Uid});
 
-                var refuser = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", user.RefUserId);
-                _csservice.CreditScore(new CreditScoreReq { Fraction = 1, Remarks = "强关系链认证（审核）", Type = TypeEnum.加分, Uid = refuser.Uid });
+                //var refuser = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", user.RefUserId);
+                //_csservice.CreditScore(new CreditScoreReq { Fraction = 1, Remarks = "强关系链认证（审核）", Type = TypeEnum.加分, Uid = refuser.Uid });
 
-                //审核节点 +1
-                var auths = await db.FetchAsync<Auth>("select * from Auth where UserAuthInfoId = @0 and IsDelete = 0 order by AuditStep", userAuthInfoId);
+                ////审核节点 +1
+                //var auths = await db.FetchAsync<Auth>("select * from Auth where UserAuthInfoId = @0 and IsDelete = 0 order by AuditStep", userAuthInfoId);
 
-                foreach (var item in auths)
-                {
-                    if (item.IsDao == IsEnum.否 && item.AuditStep == AuditStepEnum.二审)
-                    {
-                        var authuser = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", item.AuditUserId);
-                        _csservice.CreditScore(new CreditScoreReq { Fraction = 1, Remarks = "强关系链认证（审核）", Type = TypeEnum.加分, Uid = authuser.Uid });
-                    }
-                    if (item.IsDao == IsEnum.否 && item.AuditStep == AuditStepEnum.抽审)
-                    {
-                        var authuser = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", item.AuditUserId);
-                        _csservice.CreditScore(new CreditScoreReq { Fraction = 1, Remarks = "强关系链认证（审核）", Type = TypeEnum.加分, Uid = authuser.Uid });
-                    }
-                }
+                //foreach (var item in auths)
+                //{
+                //    if (item.IsDao == IsEnum.否 && item.AuditStep == AuditStepEnum.二审)
+                //    {
+                //        var authuser = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", item.AuditUserId);
+                //        _csservice.CreditScore(new CreditScoreReq { Fraction = 1, Remarks = "强关系链认证（审核）", Type = TypeEnum.加分, Uid = authuser.Uid });
+                //    }
+                //    if (item.IsDao == IsEnum.否 && item.AuditStep == AuditStepEnum.抽审)
+                //    {
+                //        var authuser = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", item.AuditUserId);
+                //        _csservice.CreditScore(new CreditScoreReq { Fraction = 1, Remarks = "强关系链认证（审核）", Type = TypeEnum.加分, Uid = authuser.Uid });
+                //    }
+                //}
             }
             else if (auth.AuditType != AuditTypeEnum.审核通过)
             {
@@ -191,6 +191,8 @@ namespace DID.Services
             //下一步审核
             if (auth.AuditStep == AuditStepEnum.初审 && auth.AuditType == AuditTypeEnum.审核通过)
             {
+                
+
                 //上级节点审核
                 var user = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", authinfo.CreatorId);
                 var authUserIds = await db.FetchAsync<string>("select AuditUserId from Auth where UserAuthInfoId = @0 and IsDelete = 0 order by AuditStep", userAuthInfoId);
@@ -259,38 +261,72 @@ namespace DID.Services
             }
             else if (auth.AuditStep == AuditStepEnum.二审 && auth.AuditType == AuditTypeEnum.审核通过)
             {
-                //中高级节点审核
+                await db.ExecuteAsync("update DIDUser set AuthType = @1 where DIDUserId = @0", authinfo.CreatorId, AuthTypeEnum.审核成功);
                 var user = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", authinfo.CreatorId);
+                //eotc认证
+                var code = CurrentUser.Authentication(user, authinfo);
+                if (code <= 0)
+                    return InvokeResult.Fail("otc用户认证失败!");
+
+                //加信用分 用户+8 邀请人+1 节点+1
+                
+                _csservice.CreditScore(new CreditScoreReq { Fraction = 8, Remarks = "完成强关系链认证", Type = TypeEnum.加分, Uid = user.Uid });
+
+                var refuser = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", user.RefUserId);
+                _csservice.CreditScore(new CreditScoreReq { Fraction = 1, Remarks = "强关系链认证（审核）", Type = TypeEnum.加分, Uid = refuser.Uid });
+
+                //审核节点 +1
+                var auths1 = await db.FetchAsync<Auth>("select * from Auth where UserAuthInfoId = @0 and IsDelete = 0 order by AuditStep", userAuthInfoId);
+
+                foreach (var item in auths1)
+                {
+                    if (item.IsDao == IsEnum.否 && item.AuditStep == AuditStepEnum.二审)
+                    {
+                        var authuser = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", item.AuditUserId);
+                        _csservice.CreditScore(new CreditScoreReq { Fraction = 1, Remarks = "强关系链认证（审核）", Type = TypeEnum.加分, Uid = authuser.Uid });
+                    }
+                    if (item.IsDao == IsEnum.否 && item.AuditStep == AuditStepEnum.抽审)
+                    {
+                        var authuser = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", item.AuditUserId);
+                        _csservice.CreditScore(new CreditScoreReq { Fraction = 1, Remarks = "强关系链认证（审核）", Type = TypeEnum.加分, Uid = authuser.Uid });
+                    }
+                }
+                //中高级节点审核
+                //var user = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", authinfo.CreatorId);
                 var authUserIds = await db.FetchAsync<string>("select AuditUserId from Auth where UserAuthInfoId = @0 and IsDelete = 0 order by AuditStep", userAuthInfoId);
                 authUserIds.Add(authinfo.CreatorId!);
                 var auths = await db.FetchAsync<DIDUser>("select * from DIDUser where (UserNode = 4 or UserNode = 5) and IsLogout = 0 and DIDUserId not in (@0)", authUserIds);
-                var random = new Random().Next(auths.Count);
-                var authUserId = auths[random].DIDUserId;
-                if (string.IsNullOrEmpty(authUserId))
-                    return InvokeResult.Success("审核失败,未找到中高级节点!");
-
-                var nextAuth = new Auth()
+                if (auths.Count <= 0)
+                    _logger.LogInformation("抽审失败,未找到中高级节点!");
+                else
                 {
-                    AuthId = Guid.NewGuid().ToString(),
-                    UserAuthInfoId = userAuthInfoId,
-                    AuditUserId = authUserId,//推荐人审核                                                                              
-                    CreateDate = DateTime.Now,
-                    AuditType = AuditTypeEnum.未审核,
-                    AuditStep = AuditStepEnum.抽审
-                };
-                //人像照处理
-                var img = Image.FromFile(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, authinfo.PortraitImage));
-                img = CommonHelp.MaSaiKeGraphics(img, 8);//随机30%马赛克
-                nextAuth.PortraitImage = "Auth/AuthImges/" + authinfo.CreatorId + "/" + Guid.NewGuid().ToString() + ".jpg";
-                img.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, nextAuth.PortraitImage));
-                //国徽面处理
-                var img1 = Image.FromFile(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, authinfo.NationalImage));
-                img1 = CommonHelp.MaSaiKeGraphics(img1, 8);//随机30%马赛克
-                nextAuth.NationalImage = "Auth/AuthImges/" + authinfo.CreatorId + "/" + Guid.NewGuid().ToString() + ".jpg";
-                img1.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, nextAuth.NationalImage));
+                    var random = new Random().Next(auths.Count);
+                    var authUserId = auths[random].DIDUserId;
+                    if (string.IsNullOrEmpty(authUserId))
+                        return InvokeResult.Success("审核失败,未找到中高级节点!");
 
-                await db.InsertAsync(nextAuth);
+                    var nextAuth = new Auth()
+                    {
+                        AuthId = Guid.NewGuid().ToString(),
+                        UserAuthInfoId = userAuthInfoId,
+                        AuditUserId = authUserId,//推荐人审核                                                                              
+                        CreateDate = DateTime.Now,
+                        AuditType = AuditTypeEnum.未审核,
+                        AuditStep = AuditStepEnum.抽审
+                    };
+                    //人像照处理
+                    var img = Image.FromFile(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, authinfo.PortraitImage));
+                    img = CommonHelp.MaSaiKeGraphics(img, 8);//随机30%马赛克
+                    nextAuth.PortraitImage = "Auth/AuthImges/" + authinfo.CreatorId + "/" + Guid.NewGuid().ToString() + ".jpg";
+                    img.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, nextAuth.PortraitImage));
+                    //国徽面处理
+                    var img1 = Image.FromFile(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, authinfo.NationalImage));
+                    img1 = CommonHelp.MaSaiKeGraphics(img1, 8);//随机30%马赛克
+                    nextAuth.NationalImage = "Auth/AuthImges/" + authinfo.CreatorId + "/" + Guid.NewGuid().ToString() + ".jpg";
+                    img1.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, nextAuth.NationalImage));
 
+                    await db.InsertAsync(nextAuth);
+                }
                 //去Dao审核
                 //ToDaoAuth(nextAuth.AuthId);
             }

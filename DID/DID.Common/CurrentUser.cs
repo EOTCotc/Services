@@ -91,25 +91,25 @@ public class CurrentUser : ICurrentUser
     /// 获取EOTC质押数量
     /// </summary>
     /// <returns></returns>
-    public static double GetEotc(string userId)
-    {
-        try
-        {
-            using var db = new NDatabase();
-            var user = db.SingleOrDefault<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
-            if (null == user)
-                return 0;
-            var client = new RestClient();
-            var request = new RestRequest(string.Format("https://api.eotcyu.club/api/DID/QueryPoints?uid={0}&pwd={1}", user.Uid, user.PassWord), Method.Post);
-            var response = client.Execute(request);
-            var model = JsonExtensions.DeserializeFromJson<EUModel>(response.Content);
-            return model.StakeEotc;
-        }
-        catch
-        {
-            return 0;
-        }
-    }
+    //public static double GetEotc(string userId)
+    //{
+    //    try
+    //    {
+    //        using var db = new NDatabase();
+    //        var user = db.SingleOrDefault<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
+    //        if (null == user)
+    //            return 0;
+    //        var client = new RestClient();
+    //        var request = new RestRequest(string.Format("https://api.eotcyu.club/api/DID/QueryPoints?uid={0}&pwd={1}", user.Uid, user.PassWord), Method.Post);
+    //        var response = client.Execute(request);
+    //        var model = JsonExtensions.DeserializeFromJson<EUModel>(response.Content);
+    //        return model.StakeEotc;
+    //    }
+    //    catch
+    //    {
+    //        return 0;
+    //    }
+    //}
 
     /// <summary>
     /// 用户注册EOTC
@@ -139,36 +139,36 @@ public class CurrentUser : ICurrentUser
     /// 获取空投
     /// </summary>
     /// <returns></returns>
-    public static double GetAirdrop(string userId)
-    {
-        try
-        {
-            using var db = new NDatabase();
-            var user = db.SingleOrDefault<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
-            if (null == user)
-                return 0;
-            var client = new RestClient();
-            var request = new RestRequest(string.Format("https://api.eotcyu.club/api/DID/QueryPoints?uid={0}&pwd={1}", user.Uid, user.PassWord), Method.Post);
-            var response = client.Execute(request);
-            var model = JsonExtensions.DeserializeFromJson<EUModel>(response.Content);
-            return model.Airdrop;
-        }
-        catch
-        {
-            return 0;
-        }
-    }
+    //public static double GetAirdrop(string userId)
+    //{
+    //    try
+    //    {
+    //        using var db = new NDatabase();
+    //        var user = db.SingleOrDefault<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
+    //        if (null == user)
+    //            return 0;
+    //        var client = new RestClient();
+    //        var request = new RestRequest(string.Format("https://api.eotcyu.club/api/DID/QueryPoints?uid={0}&pwd={1}", user.Uid, user.PassWord), Method.Post);
+    //        var response = client.Execute(request);
+    //        var model = JsonExtensions.DeserializeFromJson<EUModel>(response.Content);
+    //        return model.Airdrop;
+    //    }
+    //    catch
+    //    {
+    //        return 0;
+    //    }
+    //}
 
     /// <summary>
     /// 获取EOTC数据
     /// </summary>
     /// <returns></returns>
-    public static EUModel? GetEUModel(string userId)
+    public static EUModel? GetEUModel(DIDUser user)
     {
         try
         {
-            using var db = new NDatabase();
-            var user = db.SingleOrDefault<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
+            //using var db = new NDatabase();
+            //var user = db.SingleOrDefault<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
             if (null == user)
                 return null;
             var client = new RestClient();
@@ -187,12 +187,12 @@ public class CurrentUser : ICurrentUser
     /// eotc认证
     /// </summary>
     /// <returns></returns>
-    public static int Authentication(string userId, UserAuthInfo auth)
+    public static int Authentication(DIDUser user, UserAuthInfo auth)
     {
         try
         {
-            using var db = new NDatabase();
-            var user = db.SingleOrDefault<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
+            //using var db = new NDatabase();
+            //var user = db.SingleOrDefault<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
             if (null == user)
                 return -1;
             var client = new RestClient();
@@ -212,12 +212,12 @@ public class CurrentUser : ICurrentUser
     /// eotc修改密码
     /// </summary>
     /// <returns></returns>
-    public static int ChangePassword(string userId, string newPassWord)
+    public static int ChangePassword(DIDUser user, string newPassWord)
     {
         try
         {
-            using var db = new NDatabase();
-            var user = db.SingleOrDefault<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
+            //using var db = new NDatabase();
+            //var user = db.SingleOrDefault<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
             if (null == user)
                 return -1;
             var client = new RestClient();
@@ -237,12 +237,12 @@ public class CurrentUser : ICurrentUser
     /// eotc修改邮箱
     /// </summary>
     /// <returns></returns>
-    public static int ChangeMail(string userId, string newmail)
+    public static int ChangeMail(DIDUser user, string newmail)
     {
         try
         {
-            using var db = new NDatabase();
-            var user = db.SingleOrDefault<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
+            //using var db = new NDatabase();
+            //var user = db.SingleOrDefault<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
             if (null == user)
                 return -1;
             var client = new RestClient();

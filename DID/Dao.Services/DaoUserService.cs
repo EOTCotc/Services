@@ -92,7 +92,7 @@ namespace Dao.Services
             }
             if(user.AuthType != AuthTypeEnum.审核成功)
                 return InvokeResult.Fail("用户未认证!");
-            var eotc = CurrentUser.GetEUModel(user.DIDUserId)?.StakeEotc ?? 0;
+            var eotc = CurrentUser.GetEUModel(user)?.StakeEotc ?? 0;
             if (eotc < 5000)
                 return InvokeResult.Fail("质押EOTC数量不足!");
             if (user.IsArbitrate == IsEnum.是)
@@ -141,7 +141,7 @@ namespace Dao.Services
             }
             if (user.AuthType != AuthTypeEnum.审核成功)
                 return InvokeResult.Fail("用户未认证!");
-            var eotc = CurrentUser.GetEUModel(user.DIDUserId)?.StakeEotc ?? 0;
+            var eotc = CurrentUser.GetEUModel(user)?.StakeEotc ?? 0;
             if (eotc < 5000)
                 return InvokeResult.Fail("质押EOTC数量不足!");
             if (user.IsExamine == IsEnum.是)
