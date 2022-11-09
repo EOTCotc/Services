@@ -1,6 +1,8 @@
 ﻿using DID.Common;
 using DID.Entitys;
 using DID.Models.Base;
+using DID.Models.Request;
+using DID.Services;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
@@ -51,15 +53,18 @@ namespace DID.Controllers
 
         private readonly IMemoryCache _cache;
 
+        private readonly ICreditScoreService _csservice;
+
         /// <summary>
         /// 
         /// </summary>
         /// <param name="logger"></param>
         /// <param name="cache"></param>
-        public PayService(ILogger<PayService> logger, IMemoryCache cache)
+        public PayService(ILogger<PayService> logger, IMemoryCache cache, ICreditScoreService csservice)
         {
             _logger = logger;
             _cache = cache;
+            _csservice = csservice;
         }
         /// <summary>
         /// 添加支付信息
@@ -73,9 +78,9 @@ namespace DID.Controllers
             if (req.Type != PayType.现金支付)
             {
                 var usercode = _cache.Get(mail)?.ToString();
-                _cache.Remove(mail);
+                //_cache.Remove(mail);
                 if (usercode != code)
-                    return InvokeResult.Fail<string>("1");//验证码错误!
+                    return InvokeResult.Fail<string>("验证码错误!");//验证码错误!
             }
             using var db = new NDatabase();
             db.BeginTransaction();
@@ -87,8 +92,15 @@ namespace DID.Controllers
             }
             req.PaymentId = Guid.NewGuid().ToString();
             req.CreateDate = DateTime.Now;
-           
-            
+
+            //添加收付款方式+5
+            var payments = await db.FetchAsync<Payment>("select * from Payment where DIDUserId = @0 ", req.DIDUserId);
+            if (payments.Count <= 1)
+            {
+                var user = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", req.DIDUserId);
+                _csservice.CreditScore(new CreditScoreReq { Fraction = 5, Remarks = "添加收付款方式", Type = TypeEnum.加分, Uid = user.Uid });
+            }
+
             await db.InsertAsync(req);
             db.CompleteTransaction();
             return InvokeResult.Success("添加成功!");

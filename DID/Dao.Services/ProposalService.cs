@@ -93,7 +93,7 @@ namespace Dao.Services
             var user = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
             if (null == user)
                 return InvokeResult.Fail("用户信息未找到!");
-            var eotc = CurrentUser.GetEUModel(user.DIDUserId)?.StakeEotc ?? 0;
+            var eotc = CurrentUser.GetEUModel(user)?.StakeEotc ?? 0;
             if (eotc < 10000)
                 return InvokeResult.Fail("质押EOTC数量不足!");
             var item = new Proposal
@@ -239,7 +239,7 @@ namespace Dao.Services
             //    req.WalletAddress, req.Otype, req.Sign);
             //todo: 通过用户邮箱获取用户票数
             var user = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
-            var eotc = CurrentUser.GetEUModel(user.DIDUserId)?.StakeEotc ?? 0;
+            var eotc = CurrentUser.GetEUModel(user)?.StakeEotc ?? 0;
             var voteNum = (int)(eotc / 100);
 
             var item = await db.SingleOrDefaultByIdAsync<Proposal>(req.ProposalId);

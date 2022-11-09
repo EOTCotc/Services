@@ -218,7 +218,7 @@ namespace DID.Services
             userRespon.HasPassWord = !string.IsNullOrEmpty(user.PayPassWord);
 
             //空投
-            var model = CurrentUser.GetEUModel(user.DIDUserId);
+            var model = CurrentUser.GetEUModel(user);
             userRespon.AirdropEotc = model?.Airdrop??0;
 
             userRespon.EOTC = model?.EOTC ?? 0;
@@ -295,7 +295,7 @@ namespace DID.Services
             userRespon.HasPassWord = !string.IsNullOrEmpty(user.PayPassWord);
 
             //空投
-            var model = CurrentUser.GetEUModel(user.DIDUserId);
+            var model = CurrentUser.GetEUModel(user);
             userRespon.AirdropEotc = model?.Airdrop ?? 0;
 
             userRespon.EOTC = model?.EOTC ?? 0;
@@ -635,7 +635,7 @@ namespace DID.Services
                 return InvokeResult.Fail("用户信息未找到!");
             if (!string.IsNullOrEmpty(user.RefUserId))
             {
-                var code = CurrentUser.ChangePassword(userId, newPassWord);
+                var code = CurrentUser.ChangePassword(user, newPassWord);
                 if (code <= 0)
                     return InvokeResult.Fail("otc修改密码失败!");
             }
@@ -658,7 +658,7 @@ namespace DID.Services
                 return InvokeResult.Fail("用户信息未找到!");
             if (!string.IsNullOrEmpty(user.RefUserId))
             {
-                var code = CurrentUser.ChangePassword(user.DIDUserId, newPassWord);
+                var code = CurrentUser.ChangePassword(user, newPassWord);
                 if (code <= 0)
                     return InvokeResult.Fail("otc修改密码失败!");
             }
@@ -684,7 +684,8 @@ namespace DID.Services
             if(!string.IsNullOrEmpty(user))
                 return InvokeResult.Fail("邮箱已注册!");//邮箱已注册!
             await db.ExecuteAsync("update DIDUser set mail = @0 where DIDUserId = @1", item.Mail, userId);
-            var code = CurrentUser.ChangeMail(userId, item.Mail);
+            var user1 = db.SingleOrDefault<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
+            var code = CurrentUser.ChangeMail(user1, item.Mail);
             if (code <= 0)
                 return InvokeResult.Fail("otc修改邮箱失败!");
             return InvokeResult.Success("修改成功!");
@@ -896,7 +897,7 @@ namespace DID.Services
             var user = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
             if (null == user)
                 return InvokeResult.Fail<double>("用户信息未找到!");
-            var eotc = CurrentUser.GetEUModel(user.DIDUserId)?.StakeEotc ?? 0;
+            var eotc = CurrentUser.GetEUModel(user)?.StakeEotc ?? 0;
             return InvokeResult.Success(eotc);
         }
 

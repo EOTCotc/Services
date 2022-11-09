@@ -28,6 +28,13 @@ namespace DID.Services
         /// <param name="type"></param>
         /// <returns></returns>
         Task<Response<GetCreditScoreRespon>> GetCreditScore(string userId, long page, long itemsPerPage, TypeEnum type);
+
+        /// <summary>
+        /// 获取用户信用分
+        /// </summary>
+        /// <param name="uId"></param>
+        /// <returns></returns>
+        Task<int> GetCreditScoreByUid(string uId);
     }
     /// <summary>
     /// 信用分服务
@@ -97,6 +104,18 @@ namespace DID.Services
             var fraction = await db.SingleOrDefaultAsync<int>("select CreditScore from DIDUser where DIDUserId = @0", userId);
 
             return InvokeResult.Success(new GetCreditScoreRespon { CreditScore = fraction, Items = list });
+        }
+
+        /// <summary>
+        /// 获取用户信用分
+        /// </summary>
+        /// <param name="uId"></param>
+        /// <returns></returns>
+        public async Task<int> GetCreditScoreByUid(string uId)
+        {
+            using var db = new NDatabase();
+            var fraction = await db.SingleOrDefaultAsync<int>("select CreditScore from DIDUser where Uid = @0", uId);
+            return fraction;
         }
 
     }

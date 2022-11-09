@@ -178,5 +178,21 @@ namespace DID.Entitys
         {
             get; set;
         }
+
+        /// <summary>
+        /// 修改地址时间
+        /// </summary>
+        public DateTime? UpdateAddressDate
+        {
+            get; set;
+        }
+
+        /// <summary>
+        /// 是否修改社区名称（只能修改一次）
+        /// </summary>dat
+        public IsEnum IsUpdateComName
+        {
+            get; set;
+        }
     }
 }
