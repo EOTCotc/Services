@@ -38,14 +38,15 @@ namespace DID.Controllers
         /// <summary>
         /// 信用分操作(加分、 减分) 1 参数不合法! 2 用户未找到! 3 信用分不足!
         /// </summary>
-        /// <param name="item"></param>
+        /// <param name="req"></param>
         /// <returns></returns>
         [HttpPost]
         [Route("creditscore")]
+        [AllowAnonymous]
         public async Task<Response> CreditScore(CreditScoreReq req)
         {
             if (req.Fraction <= 0)
-                return InvokeResult.Fail("1"); //参数不合法!
+                return InvokeResult.Fail("参数不合法!"); //参数不合法!
             return await _service.CreditScore(req);
         }
 
@@ -76,5 +77,17 @@ namespace DID.Controllers
             return await _service.GetCreditScoreByUid(uId);
         }
 
+        /// <summary>
+        /// 首次添加收付款方式信用分 + 8
+        /// </summary>
+        /// <param name="uId"></param>
+        /// <returns></returns>
+        [HttpGet]
+        [Route("addpayscore")]
+        [AllowAnonymous]
+        public async Task<Response> AddPayScore(string uId)
+        {
+            return await _service.AddPayScore(uId);
+        }
     }
 }

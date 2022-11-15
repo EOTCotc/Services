@@ -299,9 +299,9 @@ namespace DID.Controllers
         /// </summary>
         [HttpGet]
         [Route("getauthimage")]
-        public IActionResult GetAuthImage(string path)
+        public async Task<IActionResult> GetAuthImage(string path)
         {
-            return _service.GetAuthImage(path, _currentUser.UserId);
+            return await _service.GetAuthImage(path, _currentUser.UserId);
         }
 
         /// <summary>
@@ -329,6 +329,32 @@ namespace DID.Controllers
                 //return InvokeResult.Fail<string>("1"); //验证码错误!
                 return InvokeResult.Fail<string>("验证码错误!");
             return await _service.SetPayPassWord(_currentUser.UserId, req.PayPassWord);
+        }
+
+        /// <summary>
+        /// 修改邀请人
+        /// </summary>
+        /// <param name="uId"></param>
+        /// <param name="pUid"></param>
+        /// <returns></returns>
+        [HttpGet]
+        [Route("updatepid")]
+        //[AllowAnonymous]
+        public async Task<Response> UpdatePid(int uId, int pUid)
+        {
+            return await _service.UpdatePid(uId, pUid);
+        }
+
+        /// <summary>
+        /// 获取社区名称
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet]
+        [Route("getinfo")]
+        [AllowAnonymous]
+        public async Task<Response<GetInfoRespon>> GetInfo(int uId)
+        {
+            return await _service.GetInfo(uId);
         }
     }
 }

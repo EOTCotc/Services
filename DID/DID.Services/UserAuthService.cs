@@ -117,8 +117,20 @@ namespace DID.Services
         {
             using var db = new NDatabase();
             var authinfo = await db.SingleByIdAsync<UserAuthInfo>(userAuthInfoId);
-            var auth = await db.SingleOrDefaultAsync<Auth>("select * from Auth where UserAuthInfoId = @0 and AuditUserId = @1", userAuthInfoId, userId);
+            var auth = new Auth();
 
+            //是否为管理员
+            if (CurrentUser.IsAdmin(userId))
+            {
+                auth = await db.SingleOrDefaultAsync<Auth>("select top 1 * from Auth where UserAuthInfoId = @0 and IsDelete = 0 order by CreateDate Desc", userAuthInfoId);
+            }
+            else
+            {
+                auth = await db.SingleOrDefaultAsync<Auth>("select * from Auth where UserAuthInfoId = @0 and AuditUserId = @1", userAuthInfoId, userId);
+            }
+
+            if (null == authinfo || null == auth)
+                return InvokeResult.Fail("审核信息未找到!");
             //不会出现重复的记录 每个用户只审核一次
             if (auth.AuditType != AuditTypeEnum.未审核)
                 return InvokeResult.Fail("已审核!");
@@ -126,6 +138,13 @@ namespace DID.Services
             auth.AuditType = auditType;
             auth.Remark = remark;
             auth.AuditDate = DateTime.Now;
+
+            //是否为管理员
+            if (CurrentUser.IsAdmin(userId))
+            {
+                auth.IsDao = IsEnum.否;
+                auth.AuditUserId = userId;
+            }
 
             db.BeginTransaction();
             await db.UpdateAsync(auth);
@@ -438,6 +457,13 @@ namespace DID.Services
             using var db = new NDatabase();
             //var items = await db.FetchAsync<Auth>("select * from Auth where AuditUserId = @0 and AuditType = 0", userId);
             var items = (await db.PageAsync<Auth>(page, itemsPerPage, "select * from Auth where AuditUserId = @0 and AuditType = 0 and IsDelete = 0 and IsDao = @1", userId, isDao)).Items;
+
+            //是否为管理员
+            if (CurrentUser.IsAdmin(userId))
+            {
+                items = (await db.PageAsync<Auth>(page, itemsPerPage, "select * from Auth where AuditType = 0 and IsDelete = 0 ")).Items;
+            }
+
             foreach (var item in items)
             {
                 var authinfo = await db.SingleOrDefaultAsync<UserAuthRespon>("select * from UserAuthInfo where UserAuthInfoId = @0", item.UserAuthInfoId);
@@ -711,8 +737,9 @@ namespace DID.Services
         {
             using var db = new NDatabase();
             var item = new AuthSuccessRespon();
-            var authinfo = await db.SingleOrDefaultAsync<UserAuthInfo>("select b.* from DIDUser a left join UserAuthInfo b on  a.UserAuthInfoId = b.UserAuthInfoId where a.DIDUserId = @0 and a.AuthType = 2", userId);
-            if (authinfo == null) return InvokeResult.Fail<AuthSuccessRespon>("1");//认证信息未找到!
+            //var authinfo = await db.SingleOrDefaultAsync<UserAuthInfo>("select b.* from DIDUser a left join UserAuthInfo b on  a.UserAuthInfoId = b.UserAuthInfoId where a.DIDUserId = @0 and a.AuthType = 2", userId);
+            var authinfo = await db.SingleOrDefaultAsync<UserAuthInfo>("select b.* from DIDUser a left join UserAuthInfo b on  a.UserAuthInfoId = b.UserAuthInfoId where a.DIDUserId = @0", userId);
+            if (authinfo == null) return InvokeResult.Fail<AuthSuccessRespon>("认证信息未找到");//认证信息未找到!
             item.Name = authinfo!.Name;
             item.PhoneNum = authinfo.PhoneNum;
             item.IdCard = authinfo.IdCard;
@@ -761,6 +788,21 @@ namespace DID.Services
                 item.Remark = auths[0].Remark;
                 item.AuditType = auths[0].AuditType;
             }
+
+            var list = new List<AuthInfo>();
+            foreach (var auth in auths)
+            {
+                list.Add(new AuthInfo()
+                {
+                    UId = await db.SingleOrDefaultAsync<int>("select Uid from DIDUser where DIDUserId = @0", auth.AuditUserId),
+                    AuditStep = auth.AuditStep,
+                    AuthDate = auth.AuditDate,
+                    Name = await db.SingleOrDefaultAsync<string>("select b.Name from DIDUser a left join UserAuthInfo b on  a.UserAuthInfoId = b.UserAuthInfoId where a.DIDUserId = @0", auth.AuditUserId),
+                    AuditType = auth.AuditType,
+                    Remark = auth.Remark
+                });
+            }
+            item.Auths = list;
             return InvokeResult.Success(item);
         }
 

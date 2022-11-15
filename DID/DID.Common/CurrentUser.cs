@@ -257,4 +257,39 @@ public class CurrentUser : ICurrentUser
             return -1;
         }
     }
+
+    /// <summary>
+    /// 更新邀请人
+    /// </summary>
+    /// <returns></returns>
+    public static int UpdatePid(DIDUser user, string pid)
+    {
+        try
+        {
+            //using var db = new NDatabase();
+            //var user = db.SingleOrDefault<DIDUser>("select * from DIDUser where DIDUserId = @0", userId);
+            if (null == user)
+                return -1;
+            var client = new RestClient();
+            var request = new RestRequest(string.Format("https://api.eotcyu.club/api/DID/UpdateParent?uid={0}&pwd={1}&pid={2}",
+                                                         user.Uid, user.PassWord, pid), Method.Post);
+            var response = client.Execute(request);
+            var model = JsonExtensions.DeserializeFromJson<CodeModel>(response.Content);
+            return model.Code;
+        }
+        catch
+        {
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// 是否为管理员
+    /// </summary>
+    /// <returns></returns>
+    public static bool IsAdmin(string uId)
+    {
+        var uIds = AppSettings.GetValue("AdminUserId").Split(';');
+        return uIds.Contains(uId);
+    }
 }

@@ -35,6 +35,13 @@ namespace DID.Services
         /// <param name="uId"></param>
         /// <returns></returns>
         Task<int> GetCreditScoreByUid(string uId);
+
+        /// <summary>
+        /// 首次添加收付款方式信用分 + 8
+        /// </summary>
+        /// <param name="uId"></param>
+        /// <returns></returns>
+        Task<Response> AddPayScore(string uId);
     }
     /// <summary>
     /// 信用分服务
@@ -118,5 +125,22 @@ namespace DID.Services
             return fraction;
         }
 
+
+        /// <summary>
+        /// 首次添加收付款方式信用分 + 8
+        /// </summary>
+        /// <param name="uId"></param>
+        /// <returns></returns>
+        public async Task<Response> AddPayScore(string uId)
+        {
+            using var db = new NDatabase();
+            var user = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where Uid = @0", uId);
+            if (null == user)
+                return InvokeResult.Fail("用户信息未找到!");
+            var id = await db.SingleOrDefaultAsync<string>("select CreditScoreHistoryId from CreditScoreHistory where DIDUserId = @0 and Remarks like '%添加收付款方式%'", user.DIDUserId);
+            if(string.IsNullOrEmpty(id))
+                await CreditScore(new CreditScoreReq { Fraction = 8, Remarks = "添加收付款方式", Type = TypeEnum.加分, Uid = user.Uid });
+            return InvokeResult.Success("添加成功");
+        }
     }
 }

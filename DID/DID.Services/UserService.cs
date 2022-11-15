@@ -137,7 +137,7 @@ namespace DID.Services
         /// <param name="path"></param>
         /// <param name="userId"></param>
         /// <returns></returns>
-        IActionResult GetAuthImage(string path, string userId);
+        Task<IActionResult> GetAuthImage(string path, string userId);
 
         /// <summary>
         /// 设置App支付密码
@@ -146,6 +146,20 @@ namespace DID.Services
         /// <param name="payPassWord"></param>
         /// <returns></returns>
         Task<Response> SetPayPassWord(string userId, string payPassWord);
+
+        /// <summary>
+        /// 修改邀请人
+        /// </summary>
+        /// <param name="uId"></param>
+        /// <param name="newUid"></param>
+        /// <returns></returns>
+        Task<Response> UpdatePid(int uId, int newUid);
+
+        /// <summary>
+        /// 获取社区名称
+        /// </summary>
+        /// <returns></returns>
+        Task<Response<GetInfoRespon>> GetInfo(int uId);
     }
     /// <summary>
     /// 审核认证服务
@@ -814,7 +828,7 @@ namespace DID.Services
                         "(select DIDUserId from DIDUser where DIDUserId = @0 and IsLogout = 0\n" +
                         "union all \n" +
                         "select a.DIDUserId from DIDUser a inner join temp on a.RefUserId = temp.DIDUserId and a.IsLogout = 0) \n" +
-                        "select Count(*) from temp", userId);
+                        "select Count(*) from temp where DIDUserId != @0", userId);
 
             model.PushNumber = await db.FirstOrDefaultAsync<int>("select Count(*) from DIDUser where RefUserId = @0 and IsLogout = 0", userId);
 
@@ -823,7 +837,7 @@ namespace DID.Services
                                                     "(select *,0 Level from DIDUser where DIDUserId = @0 and IsLogout = 0\n" +
                                                     "union all \n" +
                                                     "select a.*,temp.Level+1 Level  from DIDUser a inner join temp on a.RefUserId = temp.DIDUserId WHERE temp.Level < 6 and a.IsLogout = 0) \n" +
-                                                    "select * from temp order by (select null)\n" +
+                                                    "select * from temp where DIDUserId != @0 order by (select null)\n" +
                                                     "offset @1 rows fetch next @2 rows only", userId, (page - 1) * itemsPerPage, itemsPerPage);
 
             //todo:dao审核通过可以看所有数据
@@ -907,7 +921,7 @@ namespace DID.Services
         /// <param name="path"></param>
         /// <param name="userId"></param>
         /// <returns></returns>
-        public IActionResult GetAuthImage(string path, string userId)
+        public async Task<IActionResult> GetAuthImage(string path, string userId)
         {
             path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, path);
             using var db = new NDatabase();
@@ -947,7 +961,62 @@ namespace DID.Services
             return InvokeResult.Success("设置成功!");
         }
 
-        
+        /// <summary>
+        /// 修改邀请人
+        /// </summary>
+        /// <param name="uId"></param>
+        /// <param name="newUid"></param>
+        /// <returns></returns>
+        public async Task<Response> UpdatePid(int uId, int newUid)
+        {
+            using var db = new NDatabase();
+            if(newUid >= uId)
+                return InvokeResult.Fail<double>("邀请人错误!");
+
+            var user = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where Uid = @0", uId);
+            var refUser = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where Uid = @0", newUid);
+            if (null == user || null == refUser)
+                return InvokeResult.Fail<double>("用户信息未找到!");
+            if(user.RefUserId == refUser.DIDUserId)
+                return InvokeResult.Success("修改成功!");
+
+            db.BeginTransaction();
+            user.RefUserId = refUser.DIDUserId;
+            await db.UpdateAsync(user);
+
+            //otc更新邀请人
+            var code = CurrentUser.UpdatePid(user, newUid.ToString());
+            if (code <= 0)
+                return InvokeResult.Fail("otc更新邀请人失败!");
+            //更新社区信息
+            var userCom = await db.SingleOrDefaultAsync<UserCommunity>("select * from UserCommunity where DIDUserId = @0", user.DIDUserId);
+            if (null != userCom)
+            {
+                var communityId = await db.SingleOrDefaultAsync<string>("select CommunityId from UserCommunity where DIDUserId = @0", refUser.DIDUserId);
+                userCom.CommunityId = communityId;
+                await db.UpdateAsync(userCom);
+            }
+            db.CompleteTransaction();
+
+            return InvokeResult.Success("修改成功!");
+        }
+
+
+        /// <summary>
+        /// 获取社区名称
+        /// </summary>
+        /// <returns></returns>
+        public async Task<Response<GetInfoRespon>> GetInfo(int uId)
+        {
+            using var db = new NDatabase();
+            var user = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where Uid = @0", uId);
+            if (null == user)
+                return InvokeResult.Fail<GetInfoRespon>("用户信息未找到!");
+
+            var comName = await db.SingleOrDefaultAsync<string>("select ComName from Community where CommunityId = (select CommunityId from UserCommunity where DIDUserId = @0)", user.DIDUserId);
+
+            return InvokeResult.Success(new GetInfoRespon { ComName = comName });
+        }
 
     }
 }

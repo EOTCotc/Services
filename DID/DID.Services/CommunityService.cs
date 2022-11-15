@@ -236,9 +236,9 @@ namespace DID.Services
         {
             using var db = new NDatabase();
             var country_list = await db.FetchAsync<Area>("select Distinct a.Country code, b.Name from Community a left join Area b on a.Country = b.Code where a.AuthType = 2 and a.Country is not null");
-            var province_list = await db.FetchAsync<Area>("select Distinct a.Province code, b.Name from Community a left join Area b on a.Province = b.Code where a.AuthType = 2 and a.Province is not null");
-            var city_list = await db.FetchAsync<Area>("select Distinct a.City code, b.Name from Community a left join Area b on a.City = b.Code where a.AuthType = 2 and a.City is not null");
-            var county_list = await db.FetchAsync<Area>("select Distinct a.Area code, b.Name from Community a left join Area b on a.Area = b.Code where a.AuthType = 2 and a.Area is not null");
+            var province_list = await db.FetchAsync<Area>("select Distinct a.Province code, b.Name from Community a left join Area b on a.Province = b.Code where a.AuthType = 2 and a.Province is not null and b.pcode = a.Country");
+            var city_list = await db.FetchAsync<Area>("select Distinct a.City code, b.Name from Community a left join Area b on a.City = b.Code where a.AuthType = 2 and a.City is not null and b.pcode = a.Province");
+            var county_list = await db.FetchAsync<Area>("select Distinct a.Area code, b.Name from Community a left join Area b on a.Area = b.Code where a.AuthType = 2 and a.Area is not null and b.pcode = a.City");
 
             var country = new Dictionary<string, string>();
             country_list.ForEach(a => country.Add(a.code, a.name));
@@ -496,16 +496,36 @@ namespace DID.Services
         {
             using var db = new NDatabase();
             var authinfo = await db.SingleOrDefaultByIdAsync<Community>(communityId);
-            var auth = await db.SingleOrDefaultAsync<ComAuth>("select * from ComAuth where CommunityId = @0 and AuditUserId = @1 ", communityId, userId);
-            if(null == authinfo || null == auth)
+            //var auth = await db.SingleOrDefaultAsync<ComAuth>("select * from ComAuth where CommunityId = @0 and AuditUserId = @1 ", communityId, userId);
+            var auth = new ComAuth();
+            //是否为管理员
+            if (CurrentUser.IsAdmin(userId))
+            {
+                auth = await db.SingleOrDefaultAsync<ComAuth>("select top 1 * from ComAuth where CommunityId = @0 and IsDelete = 0 order by CreateDate Desc", communityId);
+            }
+            else
+            {
+                auth = await db.SingleOrDefaultAsync<ComAuth>("select * from ComAuth where CommunityId = @0 and AuditUserId = @1 ", communityId, userId);
+            }
+
+            if (null == authinfo || null == auth)
                 return InvokeResult.Fail("审核信息未找到!");
             //不会出现重复的记录 每个用户只审核一次
             if (auth.AuditType != AuditTypeEnum.未审核)
                 return InvokeResult.Fail("已审核!");
 
+
+
             auth.AuditType = auditType;
             auth.Remark = remark; 
             auth.AuditDate = DateTime.Now;
+
+            //是否为管理员
+            if (CurrentUser.IsAdmin(userId))
+            {
+                auth.AuditUserId = userId;
+                auth.IsDao = IsEnum.否;
+            }
 
             db.BeginTransaction();
             await db.UpdateAsync(auth);
@@ -601,25 +621,39 @@ namespace DID.Services
                 //更改用户社区信息为自己的社区 (下级用户自动加入)
                 //await db.ExecuteAsync("update UserCommunity set CommunityId = @0, CreateDate = @2  where DIDUserId = @1", communityId, authinfo.DIDUserId, DateTime.Now);
 
-                var list = await db.FetchAsync<Models.Models.UserCom>(";with temp as \n" +
+                var users = await db.FetchAsync<string>(";with temp as \n" +
                       "(select DIDUserId,ApplyCommunityId from DIDUser where DIDUserId = @0 and IsLogout = 0\n" +
                       "union all \n" +
-                      "select a.DIDUserId,a.ApplyCommunityId from DIDUser a inner join temp on a.RefUserId = temp.DIDUserId and a.IsLogout = 0) \n" +
-                      "select * from temp", authinfo.DIDUserId);
-                var users = new List<string>();
-                for (var i = 0; i < list.Count; i++)
+                      "select a.DIDUserId,a.ApplyCommunityId from DIDUser a inner join temp on a.RefUserId = temp.DIDUserId and a.IsLogout = 0 \n" +
+                      "and (a.ApplyCommunityId is null or (select AuthType from Community where CommunityId = a.ApplyCommunityId) != 2)) \n" +
+                      "select DIDUserId from temp", authinfo.DIDUserId);
+                //var users = new List<string>();
+                //for (var i = 0; i < list.Count; i++)
+                //{
+                //    if (!string.IsNullOrEmpty(list[i].ApplyCommunityId) && i > 0)//除自己到下个社区之间的用户
+                //        break;
+                //    users.Add(list[i].DIDUserId);
+
+
+                //    //await db.ExecuteAsync("update UserCommunity set CommunityId = @0, CreateDate = @2  where DIDUserId = @1", communityId, list[i].DIDUserId, DateTime.Now);
+                //}
+
+                //in 不能太多 分批查询 2000
+                var usercoms = new List<UserCommunity>();
+                //List<List<string>> listGroup = new List<List<string>>();
+                int j = 2000;
+                for (int i = 0; i < users.Count; i += 2000)
                 {
-                    if (!string.IsNullOrEmpty(list[i].ApplyCommunityId) && i > 0)//除自己到下个社区之间的用户
-                        break;
-                    users.Add(list[i].DIDUserId);
-
-
-                    //await db.ExecuteAsync("update UserCommunity set CommunityId = @0, CreateDate = @2  where DIDUserId = @1", communityId, list[i].DIDUserId, DateTime.Now);
+                    List<string> cList = new List<string>();
+                    cList = users.Take(j).Skip(i).ToList();
+                    j += 2000;
+                    //listGroup.Add(cList);
+                    usercoms.AddRange(await db.FetchAsync<UserCommunity>("select * from UserCommunity where DIDUserId in (@0)", cList));
                 }
-                var usercom = db.FetchAsync<UserCommunity>("select * from UserCommunity where DIDUserId in (@0)", users);
+                //var usercom = await db.FetchAsync<UserCommunity>("select * from UserCommunity where DIDUserId in (@0)", users);
 
                 var updates = new List<UpdateBatch<UserCommunity>>();
-                foreach (var item in usercom.Result)
+                foreach (var item in usercoms)
                 {
                     var data = new UpdateBatch<UserCommunity>();
                     data.Poco = item;
@@ -724,7 +758,7 @@ namespace DID.Services
                     Discord = community.Discord,
                     HasGroup = community.HasGroup,
                     HasOffice = community.HasOffice,
-                    Image = community.Image,
+                     Image = community.Image,
                     Mail = await db.SingleOrDefaultAsync<string>("select Mail from DIDUser where DIDUserId = @0", community.DIDUserId),
                     Phone = community.Phone,
                     QQ = community.QQ,
@@ -769,6 +803,12 @@ namespace DID.Services
             using var db = new NDatabase();
             //var items = await db.FetchAsync<ComAuth>("select * from ComAuth where AuditUserId = @0 and AuditType = 0", userId);
             var items = (await db.PageAsync<ComAuth>(page, itemsPerPage, "select * from ComAuth where AuditUserId = @0 and AuditType = 0 and IsDelete = 0 and IsDao = @1", userId, isDao)).Items;
+
+            //是否为管理员
+            if (CurrentUser.IsAdmin(userId))
+            {
+                items = (await db.PageAsync<ComAuth>(page, itemsPerPage, "select * from ComAuth where AuditType = 0 and IsDelete = 0", userId)).Items;
+            }
             foreach (var item in items)
             {
                 var community = await db.SingleOrDefaultAsync<Community>("select * from Community where CommunityId = @0", item.CommunityId);
