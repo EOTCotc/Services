@@ -28,7 +28,7 @@ namespace Dao.Services
         /// </summary>
         /// <param name="req"></param>
         /// <returns></returns>
-        Task<Response<List<UserRiskRespon>>> UserRisk(DaoBaseReq req);
+        Task<Response<List<UserRiskRespon>>> UserRisk(UserRiskReq req);
 
         /// <summary>
         /// 修改用户风险状态
@@ -100,10 +100,16 @@ namespace Dao.Services
             await db.UpdateAsync(user);
             if (req.Level == RiskLevelEnum.高风险)
             {
+                //只风控一次
+                var userRisk = await db.FetchAsync<UserRisk>("select * from UserRisk where DIDUserId = @0", userId);
+                if(userRisk.Count > 0)
+                    return InvokeResult.Success("设置成功(已风控)!");
+
                 //生成审核信息（5个人3个通过解除） 可配置
                 var list = new List<string>();
 
                 var userIds = await db.FetchAsync<DIDUser>("select * from DIDUser where DIDUserId != @0 and IsExamine = 1 and IsLogout = 0", userId);
+                //5个审核员
                 for (var i = 0; i < 5; i++)
                 {
                     var random = 0;
@@ -113,11 +119,9 @@ namespace Dao.Services
                     } while (list.Exists(a => a == userIds[random].DIDUserId));
                     list.Add(userIds[random].DIDUserId);
                 }
-                //list.Add("e8771b3c-3b05-4830-900d-df2be0a6e9f7");
-                //list.Add("d389e5db-37d0-40cd-9d8b-0d31a0ef2c12");
-                //list.Add("61d14a4f-c45f-4b13-a957-5bcaff9b3324");
-                //list.Add("7e88d292-7454-4e26-821a-b4e6049a7a95");
-                //list.Add("2a5bf1dd-e15b-40f4-94bb-b68cee2bbaf9");
+                ////1个管理员
+                //var uIds = AppSettings.GetValue("RiskAdminUserId").Split(';');
+                //list.Add(uIds[new Random().Next(uIds.Length)]);
 
                 var risks = new List<UserRisk>();
 
@@ -183,12 +187,19 @@ namespace Dao.Services
         /// </summary>
         /// <param name="req"></param>
         /// <returns></returns>
-        public async Task<Response<List<UserRiskRespon>>> UserRisk(DaoBaseReq req)
+        public async Task<Response<List<UserRiskRespon>>> UserRisk(UserRiskReq req)
         {
             using var db = new NDatabase();
             var userId = WalletHelp.GetUserId(req);
+            //管理员
+            var hasAdmin = false;
+            var uIds = AppSettings.GetValue("RiskAdminUserId").Split(';');
+            if (uIds.Contains(userId))
+                hasAdmin = true;
 
-            var models = await db.FetchAsync<UserRisk>("select * from UserRisk where AuditUserId = @0 and IsRemoveRisk = 0", userId);
+            var models = await db.FetchAsync<UserRisk>("select * from UserRisk where AuditUserId = @0 and IsRemoveRisk = 0 and IsDelete = 0 order by CreateDate desc", userId);
+            if(hasAdmin)
+                models = await db.FetchAsync<UserRisk>("select * from UserRisk where UserRiskId in (select max(UserRiskId) from UserRisk where IsRemoveRisk = 0 and IsDelete = 0 group by DIDUserId) order by CreateDate desc");
 
             var list = new List<UserRiskRespon>();
 
@@ -201,6 +212,9 @@ namespace Dao.Services
                 CreateDate = a.CreateDate
             })
             );
+
+            if (!string.IsNullOrEmpty(req.Key))
+                list = list.Where(a => a.Name.Contains(req.Key)).ToList();
 
             return InvokeResult.Success(list);
         }
@@ -230,10 +244,18 @@ namespace Dao.Services
         public async Task<Response> RemoveRisk(RemoveRiskReq req)
         {
             using var db = new NDatabase();
+            
             var item = await db.SingleOrDefaultByIdAsync<UserRisk>(req.UserRiskId);
             var userId = WalletHelp.GetUserId(req);
-            if (item.AuthStatus == RiskStatusEnum.核对成功 && item.AuditUserId == userId)
+            //管理员
+            var hasAdmin = false;
+            var uIds = AppSettings.GetValue("RiskAdminUserId").Split(';');
+
+            if (uIds.Contains(userId))
+                hasAdmin = true;
+            if (item.AuthStatus == RiskStatusEnum.核对成功 && (item.AuditUserId == userId || hasAdmin))
             {
+                db.BeginTransaction();
                 item.IsRemoveRisk = IsEnum.是;
                 //item.Images = req.Images;
                 await db.UpdateAsync(item);
@@ -241,8 +263,10 @@ namespace Dao.Services
                 var list = await db.FetchAsync<UserRisk>("select * from UserRisk where DIDUserId = @0 and IsDelete = 0", item.DIDUserId);
                 var num = list.Sum(a => a.IsRemoveRisk == IsEnum.是 ? 1 : 0);
 
-                //5个人3个通过
-                if (num >= 3)
+               
+
+                //5个人3个通过 管理员审核就算通过
+                if (num >= 3 || hasAdmin)
                 {
                     var user = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", item.DIDUserId);
                     user.RiskLevel = RiskLevelEnum.低风险;
@@ -253,7 +277,13 @@ namespace Dao.Services
                         a.IsDelete = IsEnum.是;
                         db.Update(a);
                     });
+
+                    //otc 解除风控
+                    var code = CurrentUser.RelieveRisk(user);
+                    if (code <= 0)
+                        return InvokeResult.Fail("otc解除风控失败!");
                 }
+                db.CompleteTransaction();
                 return InvokeResult.Success("解除成功!");
             }
             else
@@ -271,7 +301,7 @@ namespace Dao.Services
             using var db = new NDatabase();
             var item = await db.SingleOrDefaultByIdAsync<UserRisk>(req.UserRiskId);
             var authinfo = await db.SingleOrDefaultAsync<UserAuthInfo>("select b.* from DIDUser a left join UserAuthInfo b on  a.UserAuthInfoId = b.UserAuthInfoId where a.DIDUserId = @0 and a.AuthType = 2", item.DIDUserId);
-            if (authinfo == null) return InvokeResult.Fail<RiskUserInfo>("1");//认证信息未找到!
+            if (authinfo == null) return InvokeResult.Fail<RiskUserInfo>("认证信息未找到!");//认证信息未找到!
             var model = new RiskUserInfo();
             model.Name = CommonHelp.GetName(authinfo.Name);
 
@@ -280,6 +310,11 @@ namespace Dao.Services
             authinfo.IdCard = authinfo.IdCard.Remove(authinfo.IdCard.Length - 4, 4).Insert(authinfo.IdCard.Length - 4, "****");
             model.PhoneNum = authinfo.PhoneNum;
             model.IdCard = authinfo.IdCard;
+
+            //老的认证数据
+            model.PortraitImage = authinfo.PortraitImage;
+            model.NationalImage = authinfo.NationalImage;
+            model.HandHeldImage = authinfo.HandHeldImage;
 
             var auths = await db.FetchAsync<Auth>("select * from Auth where UserAuthInfoId = @0 order by AuditStep Desc", authinfo.UserAuthInfoId);
             if (auths.Count > 0)

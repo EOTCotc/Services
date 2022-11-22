@@ -117,11 +117,19 @@ namespace DID.Controllers
             if (!CommonHelp.IsMail(login.Mail))
                 //return InvokeResult.Fail<string>("1");//邮箱格式错误!
                 return InvokeResult.Fail<string>("邮箱格式错误!");
+            //禁用临时邮箱
+            foreach (var str in AppSettings.GetValue("MailSuffix").Split(';'))
+            {
+                if (login.Mail.Contains(str))
+                    return InvokeResult.Fail<string>("邮箱格式错误!");
+            }
             var code = _cache.Get(login.Mail)?.ToString();
             //_cache.Remove(login.Mail);
             if (code != login.Code)
                 //return InvokeResult.Fail<string>("2");//验证码错误!
                 return InvokeResult.Fail<string>("验证码错误!");
+            
+
             //if(string.IsNullOrEmpty(login.WalletAddress)||string.IsNullOrEmpty(login.Otype)|| string.IsNullOrEmpty(login.Sign))
             //    return InvokeResult.Fail<string>("5");//钱包地址为空!
             return await _service.Register(login);

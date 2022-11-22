@@ -25,5 +25,12 @@ namespace Dao.Models.Base
         {
             get; set;
         }
+        /// <summary>
+        /// 查询关键字
+        /// </summary>
+        public string? Key
+        {
+            get; set;
+        }
     }
 }

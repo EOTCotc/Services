@@ -132,6 +132,13 @@ namespace DID.Services
         /// <returns> </returns>
         Task<Response<bool>> HasComName(string comName);
 
+        /// <summary>
+        /// 添加社区
+        /// </summary>
+        /// <param name="uid"></param>
+        /// <param name="comName"></param>
+        Task<Response> AddCom(string userId, int uid, string comName);
+
     }
     /// <summary>
     /// 社区服务
@@ -768,7 +775,7 @@ namespace DID.Services
                     Eotc = CurrentUser.GetEUModel(user)?.StakeEotc ?? 0//调接口查eotc总数
                 };
 
-                var auths = await db.FetchAsync<ComAuth>("select * from ComAuth where CommunityId = @0 and IsDelete = 0 order by AuditStep", item.CommunityId);
+                var auths = await db.FetchAsync<ComAuth>("select * from ComAuth where CommunityId = @0 and IsDelete = 0 and AuditStep <= @1 order by CreateDate", item.CommunityId, item.AuditStep);
                 var list = new List<AuthInfo>();
                 foreach (var auth in auths)
                 {
@@ -802,12 +809,12 @@ namespace DID.Services
             var result = new List<ComAuthRespon>();
             using var db = new NDatabase();
             //var items = await db.FetchAsync<ComAuth>("select * from ComAuth where AuditUserId = @0 and AuditType = 0", userId);
-            var items = (await db.PageAsync<ComAuth>(page, itemsPerPage, "select * from ComAuth where AuditUserId = @0 and AuditType = 0 and IsDelete = 0 and IsDao = @1", userId, isDao)).Items;
+            var items = (await db.PageAsync<ComAuth>(page, itemsPerPage, "select * from ComAuth where AuditUserId = @0 and AuditType = 0 and IsDelete = 0 and IsDao = @1 order by CreateDate Desc", userId, isDao)).Items;
 
             //是否为管理员
             if (CurrentUser.IsAdmin(userId))
             {
-                items = (await db.PageAsync<ComAuth>(page, itemsPerPage, "select * from ComAuth where AuditType = 0 and IsDelete = 0", userId)).Items;
+                items = (await db.PageAsync<ComAuth>(page, itemsPerPage, "select * from ComAuth where AuditType = 0 and IsDelete = 0 order by CreateDate Desc", userId)).Items;
             }
             foreach (var item in items)
             {
@@ -841,7 +848,7 @@ namespace DID.Services
                     Eotc = CurrentUser.GetEUModel(user)?.StakeEotc ?? 0//调接口查eotc总数
                 };
 
-                var auths = await db.FetchAsync<ComAuth>("select * from ComAuth where CommunityId = @0 and IsDelete = 0 order by AuditStep", item.CommunityId);
+                var auths = await db.FetchAsync<ComAuth>("select * from ComAuth where CommunityId = @0 and IsDelete = 0 and AuditStep <= @1 order by CreateDate", item.CommunityId, item.AuditStep);
                 var list = new List<AuthInfo>();
                 foreach (var auth in auths)
                 {
@@ -875,7 +882,7 @@ namespace DID.Services
             var result = new List<ComAuthRespon>();
             using var db = new NDatabase();
             //var items = await db.FetchAsync<ComAuth>("select * from ComAuth where AuditUserId = @0", userId);
-            var items = (await db.PageAsync<ComAuth>(page, itemsPerPage, "select * from ComAuth where AuditUserId = @0 and IsDelete = 0 and IsDao = @1", userId, isDao)).Items;
+            var items = (await db.PageAsync<ComAuth>(page, itemsPerPage, "select * from ComAuth where AuditUserId = @0 and IsDelete = 0 and IsDao = @1 order by CreateDate Desc", userId, isDao)).Items;
             foreach (var item in items)
             {
                 var community = await db.SingleOrDefaultAsync<Community>("select * from Community where CommunityId = @0", item.CommunityId);
@@ -908,7 +915,7 @@ namespace DID.Services
                     Eotc = CurrentUser.GetEUModel(user)?.StakeEotc ?? 0//调接口查eotc总数
                 };
 
-                var auths = await db.FetchAsync<ComAuth>("select * from ComAuth where CommunityId = @0 and IsDelete = 0 order by AuditStep", item.CommunityId);
+                var auths = await db.FetchAsync<ComAuth>("select * from ComAuth where CommunityId = @0 and IsDelete = 0 and AuditStep <= @1 order by CreateDate", item.CommunityId, item.AuditStep);
                 var list = new List<AuthInfo>();
                 foreach (var auth in auths)
                 {
@@ -1030,6 +1037,72 @@ namespace DID.Services
             t.AutoReset = false;//设置是执行一次（false）还是一直执行(true)；
             t.Enabled = true;//是否执行System.Timers.Timer.Elapsed事件；
             t.Start(); //启动定时器
+        }
+
+
+        /// <summary>
+        /// 添加社区
+        /// </summary>
+        /// <param name="uid"></param>
+        /// <param name="comName"></param>
+        public async Task<Response> AddCom(string userId, int uid, string comName)
+        {
+            if (CurrentUser.IsAdmin(userId))
+            {
+                using var db = new NDatabase();
+                var user = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where Uid = @0", uid);
+                if(null == user)
+                    return InvokeResult.Fail("用户信息未找到!");
+                db.BeginTransaction();
+                var com = new Community();
+                com.CommunityId = Guid.NewGuid().ToString();
+                com.ComName = comName;
+                com.CreateDate = DateTime.Now;
+                com.AuthType = AuthTypeEnum.审核成功;
+                com.DIDUserId = user.DIDUserId;
+                await db.InsertAsync(com);
+
+                user.ApplyCommunityId = com.CommunityId;
+                await db.UpdateAsync(user);
+
+                var users = await db.FetchAsync<string>(";with temp as \n" +
+                     "(select DIDUserId,ApplyCommunityId from DIDUser where DIDUserId = @0 and IsLogout = 0\n" +
+                     "union all \n" +
+                     "select a.DIDUserId,a.ApplyCommunityId from DIDUser a inner join temp on a.RefUserId = temp.DIDUserId and a.IsLogout = 0 \n" +
+                     "and (a.ApplyCommunityId is null or (select AuthType from Community where CommunityId = a.ApplyCommunityId) != 2)) \n" +
+                     "select DIDUserId from temp", user.DIDUserId);
+
+
+                //in 不能太多 分批查询 2000
+                var usercoms = new List<UserCommunity>();
+                //List<List<string>> listGroup = new List<List<string>>();
+                int j = 2000;
+                for (int i = 0; i < users.Count; i += 2000)
+                {
+                    List<string> cList = new List<string>();
+                    cList = users.Take(j).Skip(i).ToList();
+                    j += 2000;
+                    //listGroup.Add(cList);
+                    usercoms.AddRange(await db.FetchAsync<UserCommunity>("select * from UserCommunity where DIDUserId in (@0)", cList));
+                }
+                //var usercom = await db.FetchAsync<UserCommunity>("select * from UserCommunity where DIDUserId in (@0)", users);
+
+                var updates = new List<UpdateBatch<UserCommunity>>();
+                foreach (var item in usercoms)
+                {
+                    var data = new UpdateBatch<UserCommunity>();
+                    data.Poco = item;
+                    data.Snapshot = db.StartSnapshot(item);
+                    item.CommunityId = com.CommunityId;
+                    item.CreateDate = DateTime.Now;
+                    updates.Add(data);
+                }
+
+                await db.UpdateBatchAsync(updates);
+                db.CompleteTransaction();
+                return InvokeResult.Fail("添加成功!");
+            }
+            return InvokeResult.Fail("添加失败!");
         }
     }
 }

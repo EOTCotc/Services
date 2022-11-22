@@ -81,9 +81,9 @@ namespace DID.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("getunauditedinfo")]
-        public async Task<Response<List<UserAuthRespon>>> GetUnauditedInfo(long page, long itemsPerPage)
+        public async Task<Response<List<UserAuthRespon>>> GetUnauditedInfo(long page, long itemsPerPage, string? key)
         {
-            return await _service.GetUnauditedInfo(_currentUser.UserId, IsEnum.否, page, itemsPerPage);
+            return await _service.GetUnauditedInfo(_currentUser.UserId, IsEnum.否, page, itemsPerPage, key);
         }
 
         /// <summary>
@@ -94,9 +94,9 @@ namespace DID.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("getauditedinfo")]
-        public async Task<Response<List<UserAuthRespon>>> GetAuditedInfo(long page, long itemsPerPage)
+        public async Task<Response<List<UserAuthRespon>>> GetAuditedInfo(long page, long itemsPerPage, string? key)
         {
-            return await _service.GetAuditedInfo(_currentUser.UserId, IsEnum.否, page, itemsPerPage);
+            return await _service.GetAuditedInfo(_currentUser.UserId, IsEnum.否, page, itemsPerPage, key);
         }
 
         /// <summary>
@@ -107,9 +107,9 @@ namespace DID.Controllers
         /// <returns></returns>
         [HttpGet]
         [Route("getbackinfo")]
-        public async Task<Response<List<UserAuthRespon>>> GetBackInfo(long page, long itemsPerPage)
+        public async Task<Response<List<UserAuthRespon>>> GetBackInfo(long page, long itemsPerPage, string? key)
         {
-            return await _service.GetBackInfo(_currentUser.UserId, IsEnum.否, page, itemsPerPage);
+            return await _service.GetBackInfo(_currentUser.UserId, IsEnum.否, page, itemsPerPage, key);
         }
 
 

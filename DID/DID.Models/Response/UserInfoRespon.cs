@@ -127,6 +127,13 @@ namespace DID.Models.Response
             get; set;
         }
         /// <summary>
+        /// 用户社区名称
+        /// </summary>
+        public string? ComName
+        {
+            get; set;
+        }
+        /// <summary>
         /// 用户申请社区编号
         /// </summary>
         public string? ApplyCommunityId

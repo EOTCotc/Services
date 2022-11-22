@@ -80,5 +80,13 @@ namespace Dao.Models.Response
         {
             get; set;
         }
+
+        /// <summary>
+        /// 用户节点
+        /// </summary>
+        public UserNodeEnum UserNode
+        {
+            get; set;
+        }
     }
 }

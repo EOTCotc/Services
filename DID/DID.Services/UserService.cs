@@ -217,7 +217,10 @@ namespace DID.Services
 
             //用户社区信息
             if (!string.IsNullOrEmpty(user.RefUserId))
+            {
                 userRespon.CommunityId = await db.SingleOrDefaultAsync<string>("select CommunityId from UserCommunity where DIDUserId = @0", user.DIDUserId);
+                userRespon.ComName = (await db.SingleOrDefaultByIdAsync<Community>(userRespon.CommunityId))?.ComName;
+            }
             if (!string.IsNullOrEmpty(user.ApplyCommunityId))
             {
                 userRespon.ApplyCommunityId = user.ApplyCommunityId;
@@ -287,7 +290,10 @@ namespace DID.Services
 
             //用户社区信息
             if (!string.IsNullOrEmpty(user.RefUserId))
-                userRespon.CommunityId = await db.SingleOrDefaultAsync<string>("select CommunityId from UserCommunity where DIDUserId = @0",userId);
+            {
+                userRespon.CommunityId = await db.SingleOrDefaultAsync<string>("select CommunityId from UserCommunity where DIDUserId = @0", userId);
+                userRespon.ComName = (await db.SingleOrDefaultByIdAsync<Community>(userRespon.CommunityId))?.ComName;
+            }
             if (!string.IsNullOrEmpty(user.ApplyCommunityId))
             {
                 userRespon.ApplyCommunityId = user.ApplyCommunityId;
@@ -589,7 +595,6 @@ namespace DID.Services
             //    refUser.AirdropEotc += refeotc;
             //    await db.UpdateAsync(refUser);
             //}
-            db.CompleteTransaction();
 
             //调用otc注册
             if (!string.IsNullOrEmpty(login.RefUserId))
@@ -603,7 +608,7 @@ namespace DID.Services
                 if (code <= 0)
                     return InvokeResult.Fail("otc用户注册失败!");
             }
-            
+            db.CompleteTransaction();
 
             return InvokeResult.Success("用户注册成功!");
         }

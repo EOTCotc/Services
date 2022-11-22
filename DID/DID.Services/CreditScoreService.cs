@@ -1,4 +1,5 @@
-﻿using DID.Common;
+﻿using Dao.Entity;
+using DID.Common;
 using DID.Entitys;
 using DID.Models.Base;
 using DID.Models.Request;
@@ -86,9 +87,49 @@ namespace DID.Services
                 await db.ExecuteAsync("update DIDUser set CreditScore = CreditScore + @1  where DIDUserId = @0", user.DIDUserId, item.Fraction);
             else
             {
-                if(user.CreditScore < req.Fraction)
-                    return InvokeResult.Fail("信用分不足!");//信用分不足!
+                //if(user.CreditScore < req.Fraction)
+                //    return InvokeResult.Fail("信用分不足!");//信用分不足!
+
+                //小于8分触发风控
+                if (user.CreditScore - item.Fraction < 8)
+                {
+                    //生成审核信息（5个人3个通过解除） 可配置
+                    var list = new List<string>();
+
+                    var userIds = await db.FetchAsync<DIDUser>("select * from DIDUser where DIDUserId != @0 and IsExamine = 1 and IsLogout = 0", user.DIDUserId);
+                    for (var i = 0; i < 5; i++)
+                    {
+                        var random = 0;
+                        do
+                        {
+                            random = new Random().Next(userIds.Count);
+                        } while (list.Exists(a => a == userIds[random].DIDUserId));
+                        list.Add(userIds[random].DIDUserId);
+                    }
+
+                    var risks = new List<UserRisk>();
+
+                    list.ForEach(x => risks.Add(
+                        new UserRisk
+                        {
+                            UserRiskId = Guid.NewGuid().ToString(),
+                            AuditUserId = x,
+                            DIDUserId = user.DIDUserId,
+                            AuthStatus = RiskStatusEnum.未核对,
+                            IsRemoveRisk = IsEnum.否,
+                            Reason = req.Remarks,
+                            CreateDate = DateTime.Now,
+                            IsDelete = IsEnum.否
+                        })
+                    );
+
+                    await db.InsertBatchAsync(risks);
+                }
+                   
+
                 await db.ExecuteAsync("update DIDUser set CreditScore = CreditScore - @1  where DIDUserId = @0", user.DIDUserId, item.Fraction);
+
+                
             }
             var insert = await db.InsertAsync(item);
             db.CompleteTransaction();

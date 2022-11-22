@@ -57,7 +57,7 @@ namespace Dao.Controllers
         /// <returns></returns>
         [HttpPost]
         [Route("userrisk")]
-        public async Task<Response<List<UserRiskRespon>>> UserRisk(DaoBaseReq req)
+        public async Task<Response<List<UserRiskRespon>>> UserRisk(UserRiskReq req)
         {
             return await _service.UserRisk(req);
         }
