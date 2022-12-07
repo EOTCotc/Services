@@ -55,7 +55,7 @@ namespace Dao.Controllers
         public async Task<Response<List<UserAuthRespon>>> GetUnauditedInfo(DaoBasePageReq req)
         {
             var userId = WalletHelp.GetUserId(req);
-            return await _authservice.GetUnauditedInfo(userId, IsEnum.是, req.Page, req.ItemsPerPage);
+            return await _authservice.GetUnauditedInfo(userId, IsEnum.是, req.Page, req.ItemsPerPage, req.Key);
         }
 
         /// <summary>
@@ -68,7 +68,7 @@ namespace Dao.Controllers
         public async Task<Response<List<UserAuthRespon>>> GetAuditedInfo(DaoBasePageReq req)
         {
             var userId = WalletHelp.GetUserId(req);
-            return await _authservice.GetAuditedInfo(userId, IsEnum.是, req.Page, req.ItemsPerPage);
+            return await _authservice.GetAuditedInfo(userId, IsEnum.是, req.Page, req.ItemsPerPage, req.Key);
         }
 
         /// <summary>
@@ -81,7 +81,7 @@ namespace Dao.Controllers
         public async Task<Response<List<UserAuthRespon>>> GetBackInfo(DaoBasePageReq req)
         {
             var userId = WalletHelp.GetUserId(req);
-            return await _authservice.GetBackInfo(userId, IsEnum.是, req.Page, req.ItemsPerPage);
+            return await _authservice.GetBackInfo(userId, IsEnum.是, req.Page, req.ItemsPerPage, req.Key);
         }
 
         /// <summary>

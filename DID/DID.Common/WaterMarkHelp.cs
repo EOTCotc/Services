@@ -147,9 +147,9 @@ namespace DID.Common
         public static System.Drawing.Bitmap AddWaterMark(string path, string uid)
         {
             Mat outImg = addImageWatermarkWithText(path, uid);
-            List<ImageEncodingParam> imageEncodingParams = new List<ImageEncodingParam>();
-            imageEncodingParams.Add(new ImageEncodingParam(ImwriteFlags.JpegQuality, 95));
-            Cv2.ImWrite("stzz-out.jpg", outImg, imageEncodingParams.ToArray());
+            //List<ImageEncodingParam> imageEncodingParams = new List<ImageEncodingParam>();
+            //imageEncodingParams.Add(new ImageEncodingParam(ImwriteFlags.JpegQuality, 95));
+            //Cv2.ImWrite("stzz-out.jpg", outImg, imageEncodingParams.ToArray());
             System.Drawing.Bitmap map = OpenCvSharp.Extensions.BitmapConverter.ToBitmap(outImg);
             //process_pictureBox.Image = map;
             return map;

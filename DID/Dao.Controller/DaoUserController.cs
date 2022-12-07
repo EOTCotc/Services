@@ -123,10 +123,10 @@ namespace Dao.Controllers
         /// </summary>
         [HttpPost]
         [Route("getauthimage")]
-        public IActionResult GetAuthImage(GetAuthImageReq req)
+        public async Task<IActionResult> GetAuthImage(GetAuthImageReq req)
         {
             var userId = WalletHelp.GetUserId(req);
-            return _userservice.GetAuthImage(req.Path, userId);
+            return await _userservice.GetAuthImage(req.Path, userId);
         }
 
         /// <summary>

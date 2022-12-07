@@ -38,7 +38,7 @@ namespace DID.Services
         /// <param name="page">页数</param>
         /// <param name="itemsPerPage">每页数量</param>
         /// <returns></returns>
-        Task<Response<List<UserAuthRespon>>> GetUnauditedInfo(string userId, IsEnum isDao, long page, long itemsPerPage);
+        Task<Response<List<UserAuthRespon>>> GetUnauditedInfo(string userId, IsEnum isDao, long page, long itemsPerPage, string? key);
 
         /// <summary>
         /// 获取已审核审核信息
@@ -48,7 +48,7 @@ namespace DID.Services
         /// <param name="page">页数</param>
         /// <param name="itemsPerPage">每页数量</param>
         /// <returns></returns>
-        Task<Response<List<UserAuthRespon>>> GetAuditedInfo(string userId, IsEnum isDao, long page, long itemsPerPage);
+        Task<Response<List<UserAuthRespon>>> GetAuditedInfo(string userId, IsEnum isDao, long page, long itemsPerPage, string? key);
 
         /// <summary>
         /// 获取打回信息
@@ -58,7 +58,7 @@ namespace DID.Services
         /// <param name="page">页数</param>
         /// <param name="itemsPerPage">每页数量</param>
         /// <returns></returns>
-        Task<Response<List<UserAuthRespon>>> GetBackInfo(string userId, IsEnum isDao, long page, long itemsPerPage);
+        Task<Response<List<UserAuthRespon>>> GetBackInfo(string userId, IsEnum isDao, long page, long itemsPerPage, string? key);
 
         /// <summary>
         /// 审核
@@ -117,8 +117,20 @@ namespace DID.Services
         {
             using var db = new NDatabase();
             var authinfo = await db.SingleByIdAsync<UserAuthInfo>(userAuthInfoId);
-            var auth = await db.SingleOrDefaultAsync<Auth>("select * from Auth where UserAuthInfoId = @0 and AuditUserId = @1", userAuthInfoId, userId);
+            var auth = new Auth();
 
+            //是否为管理员
+            if (CurrentUser.IsAdmin(userId))
+            {
+                auth = await db.SingleOrDefaultAsync<Auth>("select top 1 * from Auth where UserAuthInfoId = @0 and IsDelete = 0 order by CreateDate Desc", userAuthInfoId);
+            }
+            else
+            {
+                auth = await db.SingleOrDefaultAsync<Auth>("select * from Auth where UserAuthInfoId = @0 and AuditUserId = @1", userAuthInfoId, userId);
+            }
+
+            if (null == authinfo || null == auth)
+                return InvokeResult.Fail("审核信息未找到!");
             //不会出现重复的记录 每个用户只审核一次
             if (auth.AuditType != AuditTypeEnum.未审核)
                 return InvokeResult.Fail("已审核!");
@@ -126,6 +138,13 @@ namespace DID.Services
             auth.AuditType = auditType;
             auth.Remark = remark;
             auth.AuditDate = DateTime.Now;
+
+            //是否为管理员
+            if (CurrentUser.IsAdmin(userId))
+            {
+                auth.IsDao = IsEnum.否;
+                auth.AuditUserId = userId;
+            }
 
             db.BeginTransaction();
             await db.UpdateAsync(auth);
@@ -240,7 +259,12 @@ namespace DID.Services
                 img1 = CommonHelp.WhiteGraphics(img1, new Rectangle((int)(img1.Width * 0.6), 0, (int)(img1.Width * 0.4), img1.Height));//遮住右边40%
                 nextAuth.NationalImage = "Auth/AuthImges/" + authinfo.CreatorId + "/" + Guid.NewGuid().ToString() + ".jpg";
                 img1.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, nextAuth.NationalImage));
-                
+                //手持处理
+                var img2 = Image.FromFile(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, authinfo.HandHeldImage));
+                img2 = CommonHelp.WhiteGraphics(img2, new Rectangle((int)(img2.Width * 0.5), 0, (int)(img2.Width * 0.5), img2.Height));//遮住右边40%
+                nextAuth.HandHeldImage = "Auth/AuthImges/" + authinfo.CreatorId + "/" + Guid.NewGuid().ToString() + ".jpg";
+                img2.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, nextAuth.HandHeldImage));
+
                 await db.InsertAsync(nextAuth);
 
                 //去Dao审核
@@ -324,6 +348,11 @@ namespace DID.Services
                     img1 = CommonHelp.MaSaiKeGraphics(img1, 8);//随机30%马赛克
                     nextAuth.NationalImage = "Auth/AuthImges/" + authinfo.CreatorId + "/" + Guid.NewGuid().ToString() + ".jpg";
                     img1.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, nextAuth.NationalImage));
+                    //手持处理
+                    var img2 = Image.FromFile(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, authinfo.HandHeldImage));
+                    img2 = CommonHelp.MaSaiKeGraphics(img2, 8);//随机30%马赛克
+                    nextAuth.HandHeldImage = "Auth/AuthImges/" + authinfo.CreatorId + "/" + Guid.NewGuid().ToString() + ".jpg";
+                    img2.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, nextAuth.HandHeldImage));
 
                     await db.InsertAsync(nextAuth);
                 }
@@ -369,12 +398,13 @@ namespace DID.Services
         /// <param name="page">页数</param>
         /// <param name="itemsPerPage">每页数量</param>
         /// <returns></returns>
-        public async Task<Response<List<UserAuthRespon>>> GetAuditedInfo(string userId, IsEnum isDao,long page, long itemsPerPage)
+        public async Task<Response<List<UserAuthRespon>>> GetAuditedInfo(string userId, IsEnum isDao,long page, long itemsPerPage, string key)
         {
             var result = new List<UserAuthRespon>();
             using var db = new NDatabase();
             //var items = await db.FetchAsync<Auth>("select * from Auth where AuditUserId = @0 and AuditType != 0", userId);
-            var items = (await db.PageAsync<Auth>(page, itemsPerPage, "select * from Auth where AuditUserId = @0 and AuditType != 0 and IsDelete = 0 and IsDao = @1 order by CreateDate Desc", userId, isDao)).Items;
+            var items = (await db.PageAsync<Auth>(page, itemsPerPage, "select a.* from Auth a left join UserAuthInfo b on a.UserAuthInfoId = b.UserAuthInfoId where a.AuditUserId = @0 and a.AuditType != 0 and a.IsDelete = 0 and a.IsDao = @1 " +
+                " and (b.Name like '%" + key + "%' or b.PhoneNum like '%" + key + "%' or b.IdCard like '%" + key + "%') order by b.CreateDate Desc ", userId, isDao)).Items;
             foreach (var item in items)
             {
                 var authinfo = await db.SingleOrDefaultAsync<UserAuthRespon>("select * from UserAuthInfo where UserAuthInfoId = @0",item.UserAuthInfoId);
@@ -403,7 +433,7 @@ namespace DID.Services
                     if (authinfo.IdCard.Length > 7)
                         authinfo.IdCard = authinfo.IdCard.Remove(authinfo.IdCard.Length - 4, 4).Insert(authinfo.IdCard.Length - 4, "****");
                 }
-                var auths = await db.FetchAsync<Auth>("select * from Auth where UserAuthInfoId = @0 and IsDelete = 0 order by AuditStep", item.UserAuthInfoId);
+                var auths = await db.FetchAsync<Auth>("select * from Auth where UserAuthInfoId = @0 and IsDelete = 0 and AuditStep <= @1 order by CreateDate", item.UserAuthInfoId, item.AuditStep);
                 var list = new List<AuthInfo>();
                 foreach (var auth in auths)
                 {
@@ -432,12 +462,21 @@ namespace DID.Services
         /// <param name="page">页数</param>
         /// <param name="itemsPerPage">每页数量</param>
         /// <returns></returns>
-        public async Task<Response<List<UserAuthRespon>>> GetUnauditedInfo(string userId, IsEnum isDao,long page, long itemsPerPage)
+        public async Task<Response<List<UserAuthRespon>>> GetUnauditedInfo(string userId, IsEnum isDao,long page, long itemsPerPage, string key)
         {
             var result = new List<UserAuthRespon>();
             using var db = new NDatabase();
             //var items = await db.FetchAsync<Auth>("select * from Auth where AuditUserId = @0 and AuditType = 0", userId);
-            var items = (await db.PageAsync<Auth>(page, itemsPerPage, "select * from Auth where AuditUserId = @0 and AuditType = 0 and IsDelete = 0 and IsDao = @1", userId, isDao)).Items;
+            var items = (await db.PageAsync<Auth>(page, itemsPerPage, "select a.* from Auth a left join UserAuthInfo b on a.UserAuthInfoId = b.UserAuthInfoId where a.AuditUserId = @0 and a.AuditType = 0 and a.IsDelete = 0 and a.IsDao = @1" +
+                " and (b.Name like '%" + key + "%' or b.PhoneNum like '%" + key + "%' or b.IdCard like '%" + key + "%') order by b.CreateDate Desc ", userId, isDao)).Items;
+
+            //是否为管理员
+            if (CurrentUser.IsAdmin(userId))
+            {
+                items = (await db.PageAsync<Auth>(page, itemsPerPage, "select a.* from Auth a left join UserAuthInfo b on a.UserAuthInfoId = b.UserAuthInfoId where a.AuditType = 0 and a.IsDelete = 0 " +
+                    "and (b.Name like '%" + key + "%' or b.PhoneNum like '%" + key + "%' or b.IdCard like '%" + key + "%') order by b.CreateDate Desc ")).Items;
+            }
+
             foreach (var item in items)
             {
                 var authinfo = await db.SingleOrDefaultAsync<UserAuthRespon>("select * from UserAuthInfo where UserAuthInfoId = @0", item.UserAuthInfoId);
@@ -466,7 +505,7 @@ namespace DID.Services
                     if (authinfo.IdCard.Length > 7)
                         authinfo.IdCard = authinfo.IdCard.Remove(authinfo.IdCard.Length - 4, 4).Insert(authinfo.IdCard.Length - 4, "****");
                 }
-                var auths = await db.FetchAsync<Auth>("select * from Auth where UserAuthInfoId = @0 and IsDelete = 0 order by AuditStep", item.UserAuthInfoId);
+                var auths = await db.FetchAsync<Auth>("select * from Auth where UserAuthInfoId = @0 and IsDelete = 0 and AuditStep <= @1 order by CreateDate", item.UserAuthInfoId, item.AuditStep);
                 var list = new List<AuthInfo>();
                 foreach (var auth in auths)
                 {
@@ -496,12 +535,13 @@ namespace DID.Services
         /// <param name="page">页数</param>
         /// <param name="itemsPerPage">每页数量</param>
         /// <returns></returns>
-        public async Task<Response<List<UserAuthRespon>>> GetBackInfo(string userId, IsEnum isDao,long page, long itemsPerPage)
+        public async Task<Response<List<UserAuthRespon>>> GetBackInfo(string userId, IsEnum isDao,long page, long itemsPerPage, string key)
         {
             var result = new List<UserAuthRespon>();
             using var db = new NDatabase();
             //var items = await db.FetchAsync<Auth>("select * from Auth where AuditUserId = @0", userId);
-            var items = (await db.PageAsync<Auth>(page, itemsPerPage, "select * from Auth where AuditUserId = @0 and IsDelete = 0 and IsDao = @1", userId, isDao)).Items;
+            var items = (await db.PageAsync<Auth>(page, itemsPerPage, "select a.* from Auth a left join UserAuthInfo b on a.UserAuthInfoId = b.UserAuthInfoId where a.AuditUserId = @0 and a.IsDelete = 0 and a.IsDao = @1 " +
+                " and (b.Name like '%" + key + "%' or b.PhoneNum like '%" + key + "%' or b.IdCard like '%" + key + "%') order by b.CreateDate Desc ", userId, isDao, key)).Items;
             foreach (var item in items)
             {
                 var authinfo = await db.SingleOrDefaultAsync<UserAuthRespon>("select * from UserAuthInfo where UserAuthInfoId = @0", item.UserAuthInfoId);
@@ -530,7 +570,7 @@ namespace DID.Services
                     if (authinfo.IdCard.Length > 7)
                         authinfo.IdCard = authinfo.IdCard.Remove(authinfo.IdCard.Length - 4, 4).Insert(authinfo.IdCard.Length - 4, "****");
                 }
-                var auths = await db.FetchAsync<Auth>("select * from Auth where UserAuthInfoId = @0 and IsDelete = 0 order by AuditStep", item.UserAuthInfoId);
+                var auths = await db.FetchAsync<Auth>("select * from Auth where UserAuthInfoId = @0 and IsDelete = 0 and AuditStep <= @1 order by CreateDate", item.UserAuthInfoId, item.AuditStep);
                 var list = new List<AuthInfo>();
                 foreach (var auth in auths)
                 {
@@ -676,6 +716,11 @@ namespace DID.Services
             img1 = CommonHelp.WhiteGraphics(img1, new Rectangle(0, 0, (int)(img1.Width * 0.4), img1.Height));//遮住左边40%
             auth.NationalImage = "Auth/AuthImges/" + info.CreatorId + "/" + Guid.NewGuid().ToString() + ".jpg";
             img1.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, auth.NationalImage));
+            //手持处理
+            var img2 = Image.FromFile(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, info.HandHeldImage));
+            img2 = CommonHelp.WhiteGraphics(img2, new Rectangle(0, 0, (int)(img2.Width * 0.5), img2.Height));//遮住左边50%
+            auth.HandHeldImage = "Auth/AuthImges/" + info.CreatorId + "/" + Guid.NewGuid().ToString() + ".jpg";
+            img2.Save(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, auth.HandHeldImage));
 
             db.BeginTransaction();
             await db.InsertAsync(info);
@@ -711,8 +756,9 @@ namespace DID.Services
         {
             using var db = new NDatabase();
             var item = new AuthSuccessRespon();
-            var authinfo = await db.SingleOrDefaultAsync<UserAuthInfo>("select b.* from DIDUser a left join UserAuthInfo b on  a.UserAuthInfoId = b.UserAuthInfoId where a.DIDUserId = @0 and a.AuthType = 2", userId);
-            if (authinfo == null) return InvokeResult.Fail<AuthSuccessRespon>("1");//认证信息未找到!
+            //var authinfo = await db.SingleOrDefaultAsync<UserAuthInfo>("select b.* from DIDUser a left join UserAuthInfo b on  a.UserAuthInfoId = b.UserAuthInfoId where a.DIDUserId = @0 and a.AuthType = 2", userId);
+            var authinfo = await db.SingleOrDefaultAsync<UserAuthInfo>("select b.* from DIDUser a left join UserAuthInfo b on  a.UserAuthInfoId = b.UserAuthInfoId where a.DIDUserId = @0", userId);
+            if (authinfo == null) return InvokeResult.Fail<AuthSuccessRespon>("认证信息未找到");//认证信息未找到!
             item.Name = authinfo!.Name;
             item.PhoneNum = authinfo.PhoneNum;
             item.IdCard = authinfo.IdCard;
@@ -761,6 +807,21 @@ namespace DID.Services
                 item.Remark = auths[0].Remark;
                 item.AuditType = auths[0].AuditType;
             }
+
+            var list = new List<AuthInfo>();
+            foreach (var auth in auths)
+            {
+                list.Add(new AuthInfo()
+                {
+                    UId = await db.SingleOrDefaultAsync<int>("select Uid from DIDUser where DIDUserId = @0", auth.AuditUserId),
+                    AuditStep = auth.AuditStep,
+                    AuthDate = auth.AuditDate,
+                    Name = await db.SingleOrDefaultAsync<string>("select b.Name from DIDUser a left join UserAuthInfo b on  a.UserAuthInfoId = b.UserAuthInfoId where a.DIDUserId = @0", auth.AuditUserId),
+                    AuditType = auth.AuditType,
+                    Remark = auth.Remark
+                });
+            }
+            item.Auths = list;
             return InvokeResult.Success(item);
         }
 

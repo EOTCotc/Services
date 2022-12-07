@@ -93,13 +93,13 @@ namespace DID.Controllers
             req.PaymentId = Guid.NewGuid().ToString();
             req.CreateDate = DateTime.Now;
 
-            //添加收付款方式+5
-            var payments = await db.FetchAsync<Payment>("select * from Payment where DIDUserId = @0 ", req.DIDUserId);
-            if (payments.Count <= 1)
-            {
-                var user = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", req.DIDUserId);
-                _csservice.CreditScore(new CreditScoreReq { Fraction = 5, Remarks = "添加收付款方式", Type = TypeEnum.加分, Uid = user.Uid });
-            }
+            //添加收付款方式+8
+            //var payments = await db.FetchAsync<Payment>("select * from Payment where DIDUserId = @0 ", req.DIDUserId);
+            //if (payments.Count <= 1)
+            //{
+            //    var user = await db.SingleOrDefaultAsync<DIDUser>("select * from DIDUser where DIDUserId = @0", req.DIDUserId);
+            //    _csservice.CreditScore(new CreditScoreReq { Fraction = 8, Remarks = "添加收付款方式", Type = TypeEnum.加分, Uid = user.Uid });
+            //}
 
             await db.InsertAsync(req);
             db.CompleteTransaction();

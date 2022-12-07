@@ -79,7 +79,7 @@ namespace Dao.Common
             var name = db.SingleOrDefault<string>("select b.Name from DIDUser a left join UserAuthInfo b on a.UserAuthInfoId = b.UserAuthInfoId " +
                 "where a.DIDUserId = @0", userId);
 
-            return name??"未认证" + "(" + uid + ")";
+            return (name??"未认证") + "(" + uid + ")";
         }
 
         /// <summary>

@@ -235,5 +235,17 @@ namespace DID.Controllers
         {
             return await _service.HasComName(comName);
         }
+        /// <summary>
+        /// 添加社区
+        /// </summary>
+        /// <param name="uid"></param>
+        /// <param name="comName"></param>
+        [HttpPut]
+        [Route("addcom")]
+        public async Task<Response> AddCom(int uid, string comName)
+        {
+            return await _service.AddCom(_currentUser.UserId, uid, comName);
+        }
+
     }
 }

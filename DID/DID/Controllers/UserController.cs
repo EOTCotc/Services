@@ -117,11 +117,19 @@ namespace DID.Controllers
             if (!CommonHelp.IsMail(login.Mail))
                 //return InvokeResult.Fail<string>("1");//邮箱格式错误!
                 return InvokeResult.Fail<string>("邮箱格式错误!");
+            //禁用临时邮箱
+            foreach (var str in AppSettings.GetValue("MailSuffix").Split(';'))
+            {
+                if (login.Mail.Contains(str))
+                    return InvokeResult.Fail<string>("邮箱格式错误!");
+            }
             var code = _cache.Get(login.Mail)?.ToString();
             //_cache.Remove(login.Mail);
             if (code != login.Code)
                 //return InvokeResult.Fail<string>("2");//验证码错误!
                 return InvokeResult.Fail<string>("验证码错误!");
+            
+
             //if(string.IsNullOrEmpty(login.WalletAddress)||string.IsNullOrEmpty(login.Otype)|| string.IsNullOrEmpty(login.Sign))
             //    return InvokeResult.Fail<string>("5");//钱包地址为空!
             return await _service.Register(login);
@@ -299,9 +307,9 @@ namespace DID.Controllers
         /// </summary>
         [HttpGet]
         [Route("getauthimage")]
-        public IActionResult GetAuthImage(string path)
+        public async Task<IActionResult> GetAuthImage(string path)
         {
-            return _service.GetAuthImage(path, _currentUser.UserId);
+            return await _service.GetAuthImage(path, _currentUser.UserId);
         }
 
         /// <summary>
@@ -329,6 +337,32 @@ namespace DID.Controllers
                 //return InvokeResult.Fail<string>("1"); //验证码错误!
                 return InvokeResult.Fail<string>("验证码错误!");
             return await _service.SetPayPassWord(_currentUser.UserId, req.PayPassWord);
+        }
+
+        /// <summary>
+        /// 修改邀请人
+        /// </summary>
+        /// <param name="uId"></param>
+        /// <param name="pUid"></param>
+        /// <returns></returns>
+        [HttpGet]
+        [Route("updatepid")]
+        //[AllowAnonymous]
+        public async Task<Response> UpdatePid(int uId, int pUid)
+        {
+            return await _service.UpdatePid(uId, pUid);
+        }
+
+        /// <summary>
+        /// 获取社区名称
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet]
+        [Route("getinfo")]
+        [AllowAnonymous]
+        public async Task<Response<GetInfoRespon>> GetInfo(int uId)
+        {
+            return await _service.GetInfo(uId);
         }
     }
 }

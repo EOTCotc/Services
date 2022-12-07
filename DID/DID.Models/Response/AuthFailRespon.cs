@@ -63,5 +63,13 @@ namespace DID.Models.Response
         {
             get; set;
         }
+
+        /// <summary>
+        /// 审批记录
+        /// </summary>
+        public List<AuthInfo>? Auths
+        {
+            get; set;
+        }
     }
 }
